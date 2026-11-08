@@ -1,0 +1,7 @@
+# lokale Arbeitsdateien, nicht für GitHub
+strompreise.db
+*.csv
+rohdaten/
+.DS_Store
+__pycache__/
+.claude/

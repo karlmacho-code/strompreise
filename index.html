@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Strompreis AT</title>
+<meta name="description" content="EPEX Spot Day-Ahead Strompreise Österreich, stündlich seit 2021. Heute, morgen, Verlauf, Tagesprofil, Heatmap, Statistik.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M18 4 8 18h7l-1 10 10-14h-7z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.6.0/echarts.min.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"></span>
+    <div>
+      <h1>Strompreis AT</h1>
+      <p class="sub">EPEX Spot Day-Ahead · Österreich · stündlich seit 2021</p>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="seg" role="radiogroup" aria-label="Preisbasis" id="mode">
+      <button role="radio" aria-checked="true" data-v="netto">Netto</button>
+      <button role="radio" aria-checked="false" data-v="brutto">smartCONTROL</button>
+    </div>
+    <button class="icon" id="theme" aria-label="Hell/Dunkel umschalten" title="Hell/Dunkel">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+    </button>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <a role="tab" href="#heute" data-tab="heute">Heute</a>
+  <a role="tab" href="#verlauf" data-tab="verlauf">Verlauf</a>
+  <a role="tab" href="#profil" data-tab="profil">Tagesprofil</a>
+  <a role="tab" href="#heatmap" data-tab="heatmap">Heatmap</a>
+  <a role="tab" href="#statistik" data-tab="statistik">Statistik</a>
+</nav>
+
+<main id="main">
+  <div id="status" class="status">Lade Preisdaten …</div>
+
+  <!-- HEUTE -->
+  <section id="tab-heute" class="tab" hidden>
+    <div class="kpis" id="kpis"></div>
+    <div class="row">
+      <label class="field">Zeitfenster
+        <select id="win">
+          <option value="1">1 Stunde</option><option value="2">2 Stunden</option>
+          <option value="3" selected>3 Stunden</option><option value="4">4 Stunden</option>
+          <option value="5">5 Stunden</option><option value="6">6 Stunden</option>
+          <option value="8">8 Stunden</option>
+        </select>
+      </label>
+      <span class="hint">Günstigstes zusammenhängendes Fenster, heute ab jetzt</span>
+    </div>
+    <article class="card">
+      <header><h2>Heute <span class="date" id="d-heute"></span></h2><button class="tbl-btn" data-tbl="c-heute">Tabelle</button></header>
+      <p class="note" id="n-heute"></p>
+      <div class="chart" id="c-heute" style="height:300px"></div>
+      <div class="tbl" id="t-c-heute" hidden></div>
+    </article>
+    <article class="card">
+      <header><h2>Morgen <span class="date" id="d-morgen"></span></h2><button class="tbl-btn" data-tbl="c-morgen">Tabelle</button></header>
+      <p class="note" id="n-morgen"></p>
+      <div class="chart" id="c-morgen" style="height:300px"></div>
+      <div class="tbl" id="t-c-morgen" hidden></div>
+    </article>
+  </section>
+
+  <!-- VERLAUF -->
+  <section id="tab-verlauf" class="tab" hidden>
+    <div class="row">
+      <div class="seg" id="range" role="radiogroup" aria-label="Zeitraum">
+        <button role="radio" aria-checked="true" data-v="all">Alles</button>
+        <button role="radio" aria-checked="false" data-v="36">3 Jahre</button>
+        <button role="radio" aria-checked="false" data-v="12">12 Monate</button>
+      </div>
+    </div>
+    <article class="card">
+      <header><h2>Monatsmittel</h2><button class="tbl-btn" data-tbl="c-monat">Tabelle</button></header>
+      <p class="note">Linie: Monatsmittel. Band: Spanne der Tagesmittel im Monat.</p>
+      <div class="chart" id="c-monat" style="height:340px"></div>
+      <div class="tbl" id="t-c-monat" hidden></div>
+    </article>
+    <article class="card">
+      <header><h2>Jahresmittel</h2><button class="tbl-btn" data-tbl="c-jahr">Tabelle</button></header>
+      <div class="chart" id="c-jahr" style="height:260px"></div>
+      <div class="tbl" id="t-c-jahr" hidden></div>
+    </article>
+  </section>
+
+  <!-- TAGESPROFIL -->
+  <section id="tab-profil" class="tab" hidden>
+    <div class="row">
+      <label class="field">Zeitraum <select id="p-period"></select></label>
+      <div class="seg" id="p-split" role="radiogroup" aria-label="Aufteilung">
+        <button role="radio" aria-checked="true" data-v="all">Gesamt</button>
+        <button role="radio" aria-checked="false" data-v="wd">Werktag / Wochenende</button>
+        <button role="radio" aria-checked="false" data-v="season">Jahreszeiten</button>
+      </div>
+    </div>
+    <article class="card">
+      <header><h2>Mittlerer Preis je Tagesstunde</h2><button class="tbl-btn" data-tbl="c-profil">Tabelle</button></header>
+      <p class="note">Wann ist Strom strukturell günstig? Mittagstal durch Photovoltaik, Spitzen morgens und abends.</p>
+      <div class="chart" id="c-profil" style="height:340px"></div>
+      <div class="tbl" id="t-c-profil" hidden></div>
+    </article>
+  </section>
+
+  <!-- HEATMAP -->
+  <section id="tab-heatmap" class="tab" hidden>
+    <div class="row">
+      <label class="field">Jahr <select id="h-year"></select></label>
+      <div class="seg" id="h-grain" role="radiogroup" aria-label="Raster">
+        <button role="radio" aria-checked="true" data-v="month">Monate</button>
+        <button role="radio" aria-checked="false" data-v="day">Tage</button>
+      </div>
+    </div>
+    <article class="card">
+      <header><h2>Preis nach Stunde und <span id="h-title">Monat</span></h2><button class="tbl-btn" data-tbl="c-heat">Tabelle</button></header>
+      <p class="note">Dunkel = teuer, hell = günstig. Skala auf das 2.–98. Perzentil begrenzt, damit Ausreißer die Farben nicht dominieren.</p>
+      <div class="chart" id="c-heat" style="height:420px"></div>
+      <div class="tbl" id="t-c-heat" hidden></div>
+    </article>
+  </section>
+
+  <!-- STATISTIK -->
+  <section id="tab-statistik" class="tab" hidden>
+    <div class="row">
+      <label class="field">Zeitraum <select id="s-period"></select></label>
+      <label class="field">Schwelle <select id="s-thresh">
+        <option value="15">15 ct</option><option value="20">20 ct</option><option value="30" selected>30 ct</option>
+        <option value="40">40 ct</option><option value="50">50 ct</option></select></label>
+    </div>
+    <div class="kpis" id="s-kpis"></div>
+    <article class="card">
+      <header><h2>Stunden mit negativem Börsenpreis je Monat</h2><button class="tbl-btn" data-tbl="c-neg">Tabelle</button></header>
+      <p class="note">Immer auf Basis des Nettopreises. Relevant für PV-Einspeisung.</p>
+      <div class="chart" id="c-neg" style="height:260px"></div>
+      <div class="tbl" id="t-c-neg" hidden></div>
+    </article>
+    <article class="card">
+      <header><h2>Stunden über Schwelle je Monat</h2><button class="tbl-btn" data-tbl="c-peak">Tabelle</button></header>
+      <p class="note" id="n-peak"></p>
+      <div class="chart" id="c-peak" style="height:260px"></div>
+      <div class="tbl" id="t-c-peak" hidden></div>
+    </article>
+    <article class="card">
+      <header><h2>Mittlerer Preis je Wochentag</h2><button class="tbl-btn" data-tbl="c-dow">Tabelle</button></header>
+      <div class="chart" id="c-dow" style="height:260px"></div>
+      <div class="tbl" id="t-c-dow" hidden></div>
+    </article>
+    <article class="card">
+      <header><h2>Rekorde im Zeitraum</h2></header>
+      <div class="records" id="records"></div>
+    </article>
+  </section>
+</main>
+
+<footer class="foot">
+  <p id="stand"></p>
+  <p>Preise in ct/kWh. <strong>Netto</strong> = reiner Börsenpreis EPEX Spot AT Day-Ahead (ohne USt, ohne Gebühren).
+  <strong>smartCONTROL</strong> = Netto + 1,44 ct Abwicklungsgebühr, zzgl. 20 % USt (Energiepreis ohne Netz und Abgaben).
+  Seit 01.10.2025 ist der Stundenwert das Mittel der vier Viertelstunden.</p>
+  <p>Quellen: smartENERGY (bis 27.07.2025), Energy-Charts / Fraunhofer ISE mit Daten der Bundesnetzagentur | SMARD.de (CC BY 4.0). Aktualisierung täglich automatisch.</p>
+</footer>
+<script src="app.js"></script>
+</body>
+</html>

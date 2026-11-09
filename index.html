@@ -353,6 +353,21 @@
         <div class="chart" id="kb-c-preis" style="height:280px"></div>
         <div class="tbl" id="t-kb-c-preis" hidden></div>
       </article>
+      <article class="card" id="fp-card">
+        <header><h2>Dein Flex-Preis <span class="date">Tagesmittel, ct/kWh brutto</span></h2><button class="tbl-btn" data-tbl="fp-c" type="button">Tabelle</button></header>
+        <div class="row fp-ctl">
+          <label class="field">von <input type="date" id="fp-von" class="date-in"></label>
+          <label class="field">bis <input type="date" id="fp-bis" class="date-in"></label>
+          <div class="seg" id="fp-raster" role="radiogroup" aria-label="Mittelwert je"><button type="button" data-v="woche" aria-checked="false">Woche</button><button type="button" data-v="monat" aria-checked="true">Monat</button><button type="button" data-v="jahr" aria-checked="false">Jahr</button></div>
+          <button class="linkish" type="button" id="fp-reset" hidden>Zeitraum von oben übernehmen</button>
+        </div>
+        <p class="note" id="n-fp-c"></p>
+        <div class="chart" id="fp-c" style="height:300px"></div>
+        <div class="tbl" id="t-fp-c" hidden></div>
+        <p class="note fein">Tagesmittel = Durchschnitt der 24 Stundenpreise deines Flex-Tarifs (Energiepreis inkl. 20 % USt, ohne Netzkosten und Grundgebühr).
+          Wo eFriends die Preise geliefert hat, gelten diese, sonst gerechnet: Börse × 1,2 + 10 %, mindestens 2,28 ct. Mittelwert je Woche, Monat oder Jahr
+          aus den Tagen im gewählten Zeitraum; angeschnittene Wochen oder Monate am Rand zählen nur mit ihren Tagen im Zeitraum.</p>
+      </article>
       <div class="grid2 mb">
         <article class="card">
           <header><h2>Börsenpreis im Tagesverlauf <span class="date">Ø ct/kWh netto</span></h2><button class="tbl-btn" data-tbl="kb-c-tp" type="button">Tabelle</button></header>

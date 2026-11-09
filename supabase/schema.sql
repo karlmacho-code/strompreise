@@ -62,17 +62,17 @@ alter table public.messung_15min enable row level security;
 
 drop policy if exists messung_lesen on public.messung_15min;
 create policy messung_lesen on public.messung_15min for select to authenticated
-  using (private.ist_freigegeben());
+  using ((select private.ist_freigegeben()));
 drop policy if exists messung_import on public.messung_15min;
 create policy messung_import on public.messung_15min for insert to authenticated
-  with check (private.ist_freigegeben() and quelle = 'export');
+  with check ((select private.ist_freigegeben()) and quelle = 'export');
 drop policy if exists messung_import_upd on public.messung_15min;
 create policy messung_import_upd on public.messung_15min for update to authenticated
-  using (private.ist_freigegeben() and quelle = 'export')
-  with check (private.ist_freigegeben() and quelle = 'export');
+  using ((select private.ist_freigegeben()) and quelle = 'export')
+  with check ((select private.ist_freigegeben()) and quelle = 'export');
 drop policy if exists messung_loeschen on public.messung_15min;
 create policy messung_loeschen on public.messung_15min for delete to authenticated
-  using (private.ist_freigegeben() and quelle = 'export');
+  using ((select private.ist_freigegeben()) and quelle = 'export');
 
 -- Je Viertelstunde der beste Wert: Export vor Live
 create or replace view public.messung_beste with (security_invoker = true) as
@@ -94,7 +94,7 @@ create table if not exists public.live_werte (
 alter table public.live_werte enable row level security;
 drop policy if exists live_lesen on public.live_werte;
 create policy live_lesen on public.live_werte for select to authenticated
-  using (private.ist_freigegeben());
+  using ((select private.ist_freigegeben()));
 
 -- ---------------------------------------------------------------------
 -- Tarif (für die Kostenrechnung), gültig ab Datum
@@ -117,7 +117,7 @@ create table if not exists public.tarif (
 alter table public.tarif enable row level security;
 drop policy if exists tarif_alles on public.tarif;
 create policy tarif_alles on public.tarif for all to authenticated
-  using (private.ist_freigegeben()) with check (private.ist_freigegeben());
+  using ((select private.ist_freigegeben())) with check ((select private.ist_freigegeben()));
 
 insert into public.tarif (gueltig_ab, name, art)
   values ('2023-07-01', 'Der bessere Flex Tarif', 'flex')
@@ -137,7 +137,7 @@ create table if not exists public.flex_preise (
 alter table public.flex_preise enable row level security;
 drop policy if exists flex_lesen on public.flex_preise;
 create policy flex_lesen on public.flex_preise for select to authenticated
-  using (private.ist_freigegeben());
+  using ((select private.ist_freigegeben()));
 
 -- Anonyme Zugriffe grundsätzlich entziehen (zusätzlich zu RLS)
 revoke all on public.app_users, public.messung_15min, public.live_werte, public.tarif, public.flex_preise from anon;
@@ -160,7 +160,7 @@ create table if not exists public.netz_15min (
 alter table public.netz_15min enable row level security;
 drop policy if exists netz_alles on public.netz_15min;
 create policy netz_alles on public.netz_15min for all to authenticated
-  using (private.ist_freigegeben()) with check (private.ist_freigegeben());
+  using ((select private.ist_freigegeben())) with check ((select private.ist_freigegeben()));
 
 -- ---------------------------------------------------------------------
 -- PV-Anlage (Huawei FusionSolar): 15-min aus 5-min-Kurven, plus Tageswerte
@@ -177,7 +177,7 @@ create table if not exists public.pv_15min (
 alter table public.pv_15min enable row level security;
 drop policy if exists pv15_alles on public.pv_15min;
 create policy pv15_alles on public.pv_15min for all to authenticated
-  using (private.ist_freigegeben()) with check (private.ist_freigegeben());
+  using ((select private.ist_freigegeben())) with check ((select private.ist_freigegeben()));
 
 create table if not exists public.pv_tag (
   tag            date primary key,
@@ -193,7 +193,7 @@ create table if not exists public.pv_tag (
 alter table public.pv_tag enable row level security;
 drop policy if exists pvtag_alles on public.pv_tag;
 create policy pvtag_alles on public.pv_tag for all to authenticated
-  using (private.ist_freigegeben()) with check (private.ist_freigegeben());
+  using ((select private.ist_freigegeben())) with check ((select private.ist_freigegeben()));
 
 revoke all on public.netz_15min, public.pv_15min, public.pv_tag from anon;
 grant select, insert, update, delete on public.netz_15min, public.pv_15min, public.pv_tag to authenticated;
@@ -224,7 +224,7 @@ create table if not exists public.laden (
 alter table public.laden enable row level security;
 drop policy if exists laden_alles on public.laden;
 create policy laden_alles on public.laden for all to authenticated
-  using (private.ist_freigegeben()) with check (private.ist_freigegeben());
+  using ((select private.ist_freigegeben())) with check ((select private.ist_freigegeben()));
 revoke all on public.laden from anon;
 grant select, insert, update, delete on public.laden to authenticated;
 
@@ -425,7 +425,7 @@ create table if not exists public.sync_einstellung (
 );
 alter table public.sync_einstellung enable row level security;
 drop policy if exists sync_einst_lesen on public.sync_einstellung;
-create policy sync_einst_lesen on public.sync_einstellung for select to authenticated using (private.ist_freigegeben());
+create policy sync_einst_lesen on public.sync_einstellung for select to authenticated using ((select private.ist_freigegeben()));
 
 -- Protokoll jedes Laufs
 create table if not exists public.sync_lauf (
@@ -437,7 +437,7 @@ create table if not exists public.sync_lauf (
 );
 alter table public.sync_lauf enable row level security;
 drop policy if exists sync_lauf_lesen on public.sync_lauf;
-create policy sync_lauf_lesen on public.sync_lauf for select to authenticated using (private.ist_freigegeben());
+create policy sync_lauf_lesen on public.sync_lauf for select to authenticated using ((select private.ist_freigegeben()));
 
 -- Wallbox: Monta-Kennung und Viertelstunden-Verlauf je Ladung
 alter table public.laden add column if not exists monta_id text;
@@ -451,7 +451,7 @@ create table if not exists public.laden_15min (
 );
 alter table public.laden_15min enable row level security;
 drop policy if exists laden15_lesen on public.laden_15min;
-create policy laden15_lesen on public.laden_15min for select to authenticated using (private.ist_freigegeben());
+create policy laden15_lesen on public.laden_15min for select to authenticated using ((select private.ist_freigegeben()));
 
 revoke all on public.sync_einstellung, public.sync_lauf, public.laden_15min from anon;
 grant select on public.sync_einstellung, public.sync_lauf, public.laden_15min to authenticated;

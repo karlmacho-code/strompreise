@@ -492,8 +492,114 @@ async function bKosten() {
   o.series = [saeule("Bezug", pl.map(x => x[1] ? r3(x[0] / x[1]) : null), FB.netz)];
   chart("kb-c-tl", o);
   setTable("kb-c-tl", ["Stunde", "Ø kWh"], pl.map((x, h) => [hh(h), n2(x[1] ? x[0] / x[1] : null)]));
+  bFlexPreis();
   // eFriends-Abrechnung und Tarifvergleich (bestehende Diagramme)
   msKosten();
+}
+
+// ---------- Dein Flex-Preis: Tagesmittel mit Wochen-/Monats-/Jahresmittel ----------
+B.fp = { von: null, bis: null, eigen: false, raster: "monat" };
+try { B.fp.raster = localStorage.getItem("fp-raster") || "monat"; } catch (_) {}
+function isoWoche(y, m, d) {
+  const t = new Date(Date.UTC(y, m, d)), wd = (t.getUTCDay() + 6) % 7;
+  t.setUTCDate(t.getUTCDate() - wd + 3);                       // Donnerstag derselben Woche
+  const j = t.getUTCFullYear(), f = new Date(Date.UTC(j, 0, 4));
+  return { j, kw: 1 + Math.round(((t - f) / 864e5 - 3 + (f.getUTCDay() + 6) % 7) / 7) };
+}
+function fpStandard() {
+  const z = bZeit(), last = local(D.ts[D.n - 1]);
+  const start = MS.tarife.length ? MS.tarife[0].gueltig_ab : "2021-01-01";
+  const [sy, sm] = start.split("-").map(Number);
+  const a = Math.max(z.a, sy * 12 + sm - 1, D.y[0] * 12 + D.m[0]), b = Math.min(z.b, last.y * 12 + last.m);
+  const von = isoTag(Math.floor(a / 12), a % 12, a === sy * 12 + sm - 1 ? +start.slice(8, 10) : 1);
+  const bisMon = new Date(Date.UTC(Math.floor(b / 12), b % 12 + 1, 0));
+  let bis = isoTag(bisMon.getUTCFullYear(), bisMon.getUTCMonth(), bisMon.getUTCDate());
+  const lastTag = isoTag(last.y, last.m, last.d);
+  if (bis > lastTag) bis = lastTag;
+  return [von, bis];
+}
+function bFlexPreis() {
+  if (!D) return;
+  const last = local(D.ts[D.n - 1]);
+  const vonIn = $m("fp-von"), bisIn = $m("fp-bis");
+  vonIn.min = bisIn.min = isoTag(D.y[0], D.m[0], D.d[0]); vonIn.max = bisIn.max = isoTag(last.y, last.m, last.d);
+  if (!B.fp.eigen || !B.fp.von) [B.fp.von, B.fp.bis] = fpStandard();
+  if (B.fp.von > B.fp.bis) [B.fp.von, B.fp.bis] = [B.fp.bis, B.fp.von];
+  vonIn.value = B.fp.von; bisIn.value = B.fp.bis;
+  $m("fp-reset").hidden = !B.fp.eigen;
+  $m("fp-raster").querySelectorAll("button").forEach(b => b.setAttribute("aria-checked", b.dataset.v === B.fp.raster));
+
+  // Tagesmittel aus den Stundenpreisen
+  const [y0, m0, d0] = B.fp.von.split("-").map(Number), [y1, m1, d1] = B.fp.bis.split("-").map(Number);
+  const a = wienMitternacht(y0, m0 - 1, d0), b = wienMitternacht(y1, m1 - 1, d1 + 1);
+  let i = 0; { let lo = 0, hi = D.n; while (lo < hi) { const mid = (lo + hi) >> 1; if (D.ts[mid] < a) lo = mid + 1; else hi = mid; } i = lo; }
+  const tage = [], idx = new Map();
+  let exakt = 0, std = 0;
+  for (; i < D.n && D.ts[i] < b; i++) {
+    const p = Number.isNaN(D.v[i]) ? null : D.v[i];
+    const pr = msPreise(D.ts[i], tarifFuer(D.y[i], D.m[i]), p);
+    if (pr.bez == null) continue;
+    const k = dayKey(D.y[i], D.m[i], D.d[i]);
+    let t = idx.get(k);
+    if (!t) { t = { y: D.y[i], m: D.m[i], d: D.d[i], s: 0, n: 0, b: 0, bn: 0, min: Infinity, max: -Infinity }; idx.set(k, t); tage.push(t); }
+    t.s += pr.bez; t.n++; if (pr.bez < t.min) t.min = pr.bez; if (pr.bez > t.max) t.max = pr.bez;
+    if (p != null) { t.b += p; t.bn++; }
+    std++; if (pr.exakt) exakt++;
+  }
+  if (!tage.length) { keineDaten("fp-c", "Keine Preise im gewählten Zeitraum"); $m("n-fp-c").textContent = ""; return; }
+  for (const t of tage) { t.mw = t.s / t.n; t.boerse = t.bn ? t.b / t.bn : null; }
+
+  // Gruppen (Woche / Monat / Jahr)
+  const r = B.fp.raster;
+  const gruppe = t => {
+    if (r === "woche") { const w = isoWoche(t.y, t.m, t.d); return { k: w.j * 100 + w.kw, l: `KW ${w.kw}/${String(w.j).slice(2)}` }; }
+    if (r === "jahr") return { k: t.y, l: String(t.y) };
+    return { k: t.y * 12 + t.m, l: `${MONATE_LANG[t.m]} ${t.y}` };
+  };
+  const G = new Map();
+  for (const t of tage) {
+    const g = gruppe(t); t.g = g.k;
+    let e = G.get(g.k); if (!e) { e = { l: g.l, tage: [] }; G.set(g.k, e); } e.tage.push(t);
+  }
+  for (const e of G.values()) {
+    e.mw = e.tage.reduce((s, t) => s + t.mw, 0) / e.tage.length;
+    const bt = e.tage.filter(t => t.boerse != null); e.boerse = bt.length ? bt.reduce((s, t) => s + t.boerse, 0) / bt.length : null;
+    e.min = e.tage.reduce((x, t) => t.mw < x.mw ? t : x); e.max = e.tage.reduce((x, t) => t.mw > x.mw ? t : x);
+  }
+  const rasterName = { woche: "Woche", monat: "Monat", jahr: "Jahr" }[r];
+  const lab = tage.map(t => `${pad2(t.d)}.${pad2(t.m + 1)}.${String(t.y).slice(2)}`);
+
+  const o = oben(base());
+  o.grid.bottom = tage.length > 62 ? 44 : 8;
+  o.xAxis.data = lab;
+  o.xAxis.axisLabel.interval = tage.length > 400 ? (j => tage[j].d === 1 && tage[j].m === 0) : tage.length > 62 ? (j => tage[j].d === 1) : "auto";
+  o.xAxis.axisLabel.formatter = (v, j) => tage.length > 400 ? String(tage[j].y) : tage.length > 62 ? `${MONATE[tage[j].m]} ${String(tage[j].y).slice(2)}` : v;
+  o.tooltip.formatter = ps => {
+    const t = tage[ps[0].dataIndex], g = G.get(t.g);
+    return `<b>${WOCHENTAGE[new Date(t.y, t.m, t.d).getDay()]}, ${dateStr(t.y, t.m, t.d)}</b><br>` +
+      `${punkt(css(FB.netz))}Tagesmittel: ${fmt(t.mw)} ct<br><span style="color:${css("--muted")}">Stunden ${fmt(t.min)} bis ${fmt(t.max)} ct</span><br>` +
+      `${punkt(css(FB.einsp))}Ø ${g.l}: ${fmt(g.mw)} ct`;
+  };
+  o.series = [
+    { type: "line", name: "Tagesmittel", data: tage.map(t => +t.mw.toFixed(2)), showSymbol: false, lineStyle: { width: tage.length > 120 ? 1 : 1.5, color: css(FB.netz) }, itemStyle: { color: css(FB.netz) },
+      areaStyle: { color: css("--accent-wash") } },
+    { type: "line", name: `Ø je ${rasterName}`, data: tage.map(t => +G.get(t.g).mw.toFixed(2)), step: "middle", showSymbol: false, lineStyle: { width: 2.5, color: css(FB.einsp) }, itemStyle: { color: css(FB.einsp) }, z: 3 },
+  ];
+  if (tage.length > 62) o.dataZoom = [{ type: "inside" }, { type: "slider", height: 18, bottom: 6, borderColor: css("--border"), fillerColor: css("--accent-wash"),
+    handleStyle: { color: css("--surface"), borderColor: css("--axis") }, textStyle: { color: css("--muted"), fontSize: 11 }, dataBackground: { lineStyle: { color: css("--axis") }, areaStyle: { color: css("--grid") } } }];
+  chart("fp-c", o);
+
+  const liste = [...G.values()];
+  setTable("fp-c", [rasterName, "Tage", "Ø Flex ct brutto", "günstigster Tag", "teuerster Tag", "Ø Börse ct netto"],
+    liste.map(e => [e.l, e.tage.length, fmt(e.mw), `${fmt(e.min.mw)} (${pad2(e.min.d)}.${pad2(e.min.m + 1)}.)`, `${fmt(e.max.mw)} (${pad2(e.max.d)}.${pad2(e.max.m + 1)}.)`, fmt(e.boerse)]));
+  const gesamt = tage.reduce((s, t) => s + t.mw, 0) / tage.length;
+  const tMin = tage.reduce((x, t) => t.mw < x.mw ? t : x), tMax = tage.reduce((x, t) => t.mw > x.mw ? t : x);
+  const gMin = liste.reduce((x, e) => e.mw < x.mw ? e : x), gMax = liste.reduce((x, e) => e.mw > x.mw ? e : x);
+  $m("n-fp-c").textContent = `${dateStr(y0, m0 - 1, d0)} bis ${dateStr(y1, m1 - 1, d1)}: Ø ${fmt(gesamt)} ct/kWh über ${nf0.format(tage.length)} Tage. ` +
+    `Günstigster Tag ${dateStr(tMin.y, tMin.m, tMin.d)} mit ${fmt(tMin.mw)} ct, teuerster ${dateStr(tMax.y, tMax.m, tMax.d)} mit ${fmt(tMax.mw)} ct.` +
+    (liste.length > 1 ? ` ${rasterName === "Woche" ? "Günstigste Woche" : rasterName === "Monat" ? "Günstigster Monat" : "Günstigstes Jahr"}: ${gMin.l} (${fmt(gMin.mw)} ct), ` +
+      `${rasterName === "Woche" ? "teuerste" : rasterName === "Monat" ? "teuerster" : "teuerstes"}: ${gMax.l} (${fmt(gMax.mw)} ct).` : "") +
+    (exakt ? ` ${nf0.format(exakt)} von ${nf0.format(std)} Stunden mit Preisen direkt von eFriends, der Rest nach der Tarifformel gerechnet (stimmt mit den eFriends-Preisen überein).` : "");
 }
 
 // ---------- Bereich: Tag im Detail ----------
@@ -606,6 +712,14 @@ function bInit() {
     $m("ab-art").querySelectorAll("button").forEach(x => x.setAttribute("aria-checked", x === b)); B.abArt = b.dataset.v; bZeichnen();
   });
   $m("ab-tage").addEventListener("click", e => { const b = e.target.closest("[data-zum-tag]"); if (b) bTagSetzen(b.dataset.zumTag); });
+  const fpSetzen = () => { const v = $m("fp-von").value, b = $m("fp-bis").value; if (!v || !b) return; B.fp.von = v; B.fp.bis = b; B.fp.eigen = true; bFlexPreis(); };
+  $m("fp-von").addEventListener("change", fpSetzen);
+  $m("fp-bis").addEventListener("change", fpSetzen);
+  $m("fp-reset").addEventListener("click", () => { B.fp.eigen = false; bFlexPreis(); });
+  $m("fp-raster").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    B.fp.raster = b.dataset.v; try { localStorage.setItem("fp-raster", B.fp.raster); } catch (_) {} bFlexPreis();
+  });
   $m("tg-datum").addEventListener("change", e => { if (e.target.value) { B.tag = e.target.value; bZeichnen(); } });
   const schritt = n => { if (!B.tag) return; const [y, m, d] = B.tag.split("-").map(Number); const t = new Date(Date.UTC(y, m - 1, d + n)); B.tag = isoTag(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()); bZeichnen(); };
   $m("tg-zurueck").addEventListener("click", () => schritt(-1));

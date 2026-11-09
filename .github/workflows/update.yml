@@ -20,6 +20,8 @@ jobs:
           python-version: "3.12"
       - name: Preise von Energy-Charts holen
         run: python3 scripts/update.py
+      - name: Sonnenstunden Poysdorf Ost (GeoSphere) aktualisieren
+        run: python3 scripts/sonne.py
       - name: Änderungen committen
         run: |
           git config user.name "github-actions[bot]"

@@ -390,6 +390,103 @@ function bPV() {
     M.map(e => { const l = summe(e.tage, t => t.lad), x = summe(e.tage, t => t.entl); return [e.ttl, nk(l), nk(x), l ? nf0.format(x / l * 100) + " %" : "–"]; }));
 }
 
+// ---------- Sonnenstunden (GeoSphere Poysdorf Ost) und Abgleich mit dem PV-Ertrag ----------
+B.so = { raster: "monat", daten: null };
+try { B.so.raster = localStorage.getItem("so-raster") || "monat"; } catch (_) {}
+async function soLaden() {
+  if (B.so.daten === null) {
+    try { const r = await fetch("data/sonne.json", { cache: "no-store" }); B.so.daten = r.ok ? await r.json() : false; } catch (_) { B.so.daten = false; }
+  }
+  return B.so.daten;
+}
+async function bSonne() {
+  const S = await soLaden();
+  const ids = ["so-c-sonne", "so-c-pv", "so-c-streu"];
+  if (!S) { ids.forEach(id => keineDaten(id, "Wetterdaten (data/sonne.json) nicht verfügbar")); return; }
+  $m("so-raster").querySelectorAll("button").forEach(b => b.setAttribute("aria-checked", b.dataset.v === B.so.raster));
+  // Tage im Zeitraum: Wetter + PV zusammenführen
+  const pvTag = new Map((B.tage || []).map(t => [t.tag, t.pv]));
+  const z = bZeit();
+  const T = [];
+  for (const [tag, so, gl, tl] of S.tage) {
+    const [y, mo, d] = tag.split("-").map(Number);
+    if (!(y * 12 + mo - 1 >= z.a && y * 12 + mo - 1 <= z.b)) continue;
+    T.push({ tag, y, m: mo - 1, d, so, gl: gl == null ? null : gl / 360, tl, pv: pvTag.has(tag) ? pvTag.get(tag) : null });   // gl: J/cm² → kWh/m²
+  }
+  if (!T.length) { ids.forEach(id => keineDaten(id)); $m("so-tage").innerHTML = ""; return; }
+  // Anlagenfaktor: PV-kWh je kWh/m² Globalstrahlung (robuster Median der Tagesverhältnisse bei nennenswerter Strahlung)
+  const q = T.filter(t => t.pv != null && t.gl != null && t.gl > 1.5).map(t => t.pv / t.gl).sort((a, b) => a - b);
+  const faktor = q.length ? q[Math.floor(q.length * 0.6)] : null;     // 60. Perzentil ≈ Tage ohne Störung
+  for (const t of T) t.erw = faktor != null && t.gl != null ? t.gl * faktor : null;
+  // Gruppierung
+  const r = B.so.raster;
+  const gruppe = t => {
+    if (r === "tag") return { k: t.tag, l: `${pad2(t.d)}.${pad2(t.m + 1)}.${String(t.y).slice(2)}`, lang: dateStr(t.y, t.m, t.d) };
+    if (r === "woche") { const w = isoWoche(t.y, t.m, t.d); return { k: `${w.j}-${pad2(w.kw)}`, l: `KW ${w.kw}`, lang: `KW ${w.kw}/${w.j}` }; }
+    return { k: `${t.y}-${pad2(t.m + 1)}`, l: `${MONATE[t.m]} ${String(t.y).slice(2)}`, lang: `${MONATE_LANG[t.m]} ${t.y}` };
+  };
+  const G = new Map();
+  for (const t of T) { const g = gruppe(t); let e = G.get(g.k); if (!e) { e = { ...g, tage: [] }; G.set(g.k, e); } e.tage.push(t); }
+  const L = [...G.values()];
+  for (const e of L) {
+    e.so = summe(e.tage, t => t.so); e.gl = summe(e.tage, t => t.gl); e.pv = summe(e.tage, t => t.pv); e.erw = summe(e.tage.filter(t => t.pv != null), t => t.erw);
+    e.n = e.tage.filter(t => t.so != null).length; e.nPv = e.tage.filter(t => t.pv != null).length;
+  }
+  const achse = o => {
+    o.xAxis.data = L.map(e => e.l);
+    if (r === "tag") { o.xAxis.axisLabel.interval = L.length > 120 ? (i => L[i].tage[0].d === 1 && L[i].tage[0].m % 3 === 0) : L.length > 40 ? (i => L[i].tage[0].d === 1) : "auto"; o.xAxis.axisLabel.formatter = (v, i) => L.length > 40 ? `${MONATE[L[i].tage[0].m]} ${String(L[i].tage[0].y).slice(2)}` : v; }
+    else if (r === "woche") { o.xAxis.axisLabel.interval = L.length > 30 ? (i => L[i].tage.some(t => t.d <= 7) && L[i].tage[0].m % (L.length > 80 ? 3 : 1) === 0) : "auto"; if (L.length > 30) o.xAxis.axisLabel.formatter = (v, i) => `${MONATE[L[i].tage[L[i].tage.length - 1].m]} ${String(L[i].tage[0].y).slice(2)}`; }
+    else monatsAchse(o, L.map(e => ({ ttl: e.l, m: e.tage[0].m, y: e.tage[0].y })));
+    if (r !== "monat" && L.length > 62) { o.grid.bottom = 44; o.dataZoom = [{ type: "inside" }, { type: "slider", height: 18, bottom: 6, borderColor: css("--border"), fillerColor: css("--accent-wash"), handleStyle: { color: css("--surface"), borderColor: css("--axis") }, textStyle: { color: css("--muted"), fontSize: 11 }, dataBackground: { lineStyle: { color: css("--axis") }, areaStyle: { color: css("--grid") } } }]; }
+  };
+  const einheit = r === "tag" ? "h" : "h";
+  // 1) Sonnenstunden
+  let o = oben(base(), false); achse(o);
+  o.tooltip.formatter = ps => { const e = L[ps[0].dataIndex]; return `<b>${e.lang}</b><br>${punkt(css(FB.pv))}Sonnenstunden: ${n1(e.so)} h${r !== "tag" ? ` (Ø ${n1(e.so / Math.max(e.n, 1))} h/Tag)` : ""}<br><span style="color:${css("--muted")}">Globalstrahlung ${n1(e.gl)} kWh/m²${e.tage[0].tl != null && r === "tag" ? ` · Ø ${n1(e.tage[0].tl)} °C` : ""}</span>`; };
+  o.series = [{ type: "bar", name: "Sonnenstunden", data: L.map(e => r1(e.so)), barMaxWidth: r === "tag" ? 10 : 36, barCategoryGap: "20%", itemStyle: { color: css(FB.pv), borderRadius: [3, 3, 0, 0] } }];
+  chart("so-c-sonne", o);
+  setTable("so-c-sonne", [r === "tag" ? "Tag" : r === "woche" ? "Woche" : "Monat", "Sonnenstunden", "Ø h je Tag", "Globalstrahlung kWh/m²", "Ø Temperatur °C"],
+    L.map(e => [e.lang, n1(e.so), n1(e.so / Math.max(e.n, 1)), n1(e.gl), n1(summe(e.tage, t => t.tl) / Math.max(e.tage.filter(t => t.tl != null).length, 1))]));
+  const soSum = summe(T, t => t.so), nSo = T.filter(t => t.so != null).length, bestTag = T.reduce((x, t) => (t.so != null && (x == null || t.so > x.so)) ? t : x, null);
+  $m("n-so-c-sonne").textContent = `${zeitText()}: ${nf0.format(soSum)} Sonnenstunden an ${nSo} Tagen, Ø ${n1(soSum / Math.max(nSo, 1))} h je Tag` + (bestTag ? `, Maximum ${n1(bestTag.so)} h am ${dateStr(bestTag.y, bestTag.m, bestTag.d)}.` : ".");
+  // 2) PV gemessen vs. erwartet
+  o = oben(base()); achse(o);
+  o.tooltip.formatter = ps => { const e = L[ps[0].dataIndex]; const dv = e.pv != null && e.erw ? (e.pv / e.erw - 1) * 100 : null; return `<b>${e.lang}</b><br>` + ps.filter(p => p.value != null).map(p => `${punkt(p.color)}${p.seriesName}: ${nk(p.value)} kWh`).join("<br>") + (dv != null ? `<br><span style="color:${css("--muted")}">${pz(dv)} gegenüber Erwartung</span>` : ""); };
+  o.series = [{ type: "bar", name: "PV gemessen", data: L.map(e => e.pv == null ? null : r1(e.pv)), barMaxWidth: r === "tag" ? 10 : 36, barCategoryGap: "20%", itemStyle: { color: css(FB.pv), borderRadius: [3, 3, 0, 0] } },
+    { type: "line", name: "aus Globalstrahlung erwartet", data: L.map(e => e.erw == null ? null : r1(e.erw)), step: r === "tag" ? false : "middle", showSymbol: false, lineStyle: { width: 2, color: css(FB.netz) }, itemStyle: { color: css(FB.netz) }, z: 3 }];
+  chart("so-c-pv", o);
+  setTable("so-c-pv", [r === "tag" ? "Tag" : r === "woche" ? "Woche" : "Monat", "PV kWh", "erwartet kWh", "Abweichung", "Sonnenstunden", "kWh je Sonnenstunde"],
+    L.map(e => [e.lang, nk(e.pv), nk(e.erw), e.pv != null && e.erw ? pz((e.pv / e.erw - 1) * 100) : "–", n1(e.so), e.so ? n1(e.pv / e.so) : "–"]));
+  const mitPv = T.filter(t => t.pv != null && t.erw != null);
+  const sPv = summe(mitPv, t => t.pv), sErw = summe(mitPv, t => t.erw), sSo = summe(mitPv, t => t.so);
+  // Korrelation Tageswerte
+  const xs = mitPv.filter(t => t.so != null).map(t => t.so), ys = mitPv.filter(t => t.so != null).map(t => t.pv);
+  const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+  let sxy = 0, sxx = 0, syy = 0; for (let i = 0; i < xs.length; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; syy += (ys[i] - my) ** 2; }
+  const rKorr = sxx && syy ? sxy / Math.sqrt(sxx * syy) : null, steig = sxx ? sxy / sxx : 0, achs = my - steig * mx;
+  $m("n-so-c-pv").textContent = mitPv.length ? `${mitPv.length} Tage mit PV- und Wetterdaten: ${nk(sPv)} kWh gemessen, ${nk(sErw)} kWh aus der Globalstrahlung erwartet (${pz((sPv / sErw - 1) * 100)}). ` +
+    `Anlagenfaktor ${n2(faktor)} kWh je kWh/m²${B.kwp ? ` (${nf0.format(faktor / B.kwp * 100)} % Performance Ratio)` : ""}, ${n1(sPv / sSo)} kWh je Sonnenstunde, Korrelation Tagesertrag–Sonnenstunden r = ${n2(rKorr)}.` : "Keine überlappenden PV- und Wetterdaten im Zeitraum.";
+  // 3) Streudiagramm Tag
+  o = base(); o.grid = { left: 8, right: 16, top: 28, bottom: 30, containLabel: true }; o.tooltip.trigger = "item"; o.tooltip.axisPointer = undefined;
+  o.xAxis = { type: "value", name: "Sonnenstunden je Tag", nameLocation: "middle", nameGap: 26, nameTextStyle: { color: css("--muted"), fontSize: 11 }, min: 0, max: 16, interval: 4, axisLabel: { color: css("--muted"), fontSize: 11 }, splitLine: { lineStyle: { color: css("--grid") } } };
+  o.yAxis.name = "kWh"; o.yAxis.nameTextStyle = { color: css("--muted"), fontSize: 11 };
+  o.tooltip.formatter = p => p.seriesType === "line" ? "" : `<b>${p.data[2]}</b><br>${n1(p.data[0])} h Sonne · ${nk(p.data[1])} kWh${p.data[3] != null ? `<br><span style="color:${css("--muted")}">erwartet ${nk(p.data[3])} kWh</span>` : ""}`;
+  const sommer = t => t.m >= 3 && t.m <= 8;
+  const pt = f => mitPv.filter(t => t.so != null && f(t)).map(t => [r1(t.so), r1(t.pv), dateStr(t.y, t.m, t.d), r1(t.erw)]);
+  o.series = [
+    { type: "scatter", name: "Apr–Sep", data: pt(sommer), symbolSize: 7, itemStyle: { color: css(FB.pv), opacity: 0.75 } },
+    { type: "scatter", name: "Okt–Mär", data: pt(t => !sommer(t)), symbolSize: 7, itemStyle: { color: css(FB.netz), opacity: 0.75 } },
+    { type: "line", name: "Trend", data: [[0, r1(achs)], [16, r1(achs + 16 * steig)]], showSymbol: false, lineStyle: { color: css("--text-2"), width: 1.5, type: "dashed" }, silent: true },
+  ];
+  o.legend = { top: 0, right: 0, icon: "circle", itemWidth: 8, itemHeight: 8, textStyle: { color: css("--text-2"), fontSize: 12 }, data: ["Apr–Sep", "Okt–Mär"] };
+  chart("so-c-streu", o);
+  // 4) Auffällige Tage
+  const auff = mitPv.filter(t => t.gl != null && t.gl >= 2 && t.erw > 5).map(t => ({ t, d: t.pv / t.erw - 1 })).filter(x => x.d < -0.35).sort((a, b) => a.d - b.d).slice(0, 15);
+  $m("so-tage").innerHTML = auff.length ? `<table><thead><tr><th>Tag</th><th>Sonne h</th><th>Strahlung kWh/m²</th><th>Ø °C</th><th>PV kWh</th><th>erwartet</th><th>Abw.</th><th></th></tr></thead><tbody>${
+    auff.map(({ t, d }) => `<tr><td>${dateStr(t.y, t.m, t.d)} ${WOCHENTAGE[new Date(t.y, t.m, t.d).getDay()]}</td><td>${n1(t.so)}</td><td>${n1(t.gl)}</td><td>${n1(t.tl)}</td><td>${n1(t.pv)}</td><td>${n1(t.erw)}</td><td>${pz(d * 100)}</td><td><button class="tbl-btn" type="button" data-zum-tag="${t.tag}">Tag</button></td></tr>`).join("")}</tbody></table>`
+    : `<p class="note">Keine Tage mit deutlich zu geringem Ertrag im Zeitraum.</p>`;
+}
+
 // ---------- Bereich: Wallboxen ----------
 function ladungPreis(l) {
   const a = Date.parse(l.start) / 1000; let b = l.ende ? Date.parse(l.ende) / 1000 : a + (l.kwh || 0) / 11 * 3600;
@@ -678,7 +775,7 @@ async function bTag() {
 }
 
 // ---------- Navigation ----------
-const BR = { uebersicht: bUebersicht, abgleich: bAbgleich, netz: bNetz, pv: bPV, wallbox: bWallbox, kosten: bKosten, tag: bTag, verwaltung: () => {} };
+const BR = { uebersicht: bUebersicht, abgleich: bAbgleich, netz: bNetz, pv: async () => { bPV(); await bSonne(); }, wallbox: bWallbox, kosten: bKosten, tag: bTag, verwaltung: () => {} };
 function bZeichnen() {
   if (!B.tage) return;
   if (!BR[B.sec]) B.sec = "uebersicht";
@@ -712,6 +809,11 @@ function bInit() {
     $m("ab-art").querySelectorAll("button").forEach(x => x.setAttribute("aria-checked", x === b)); B.abArt = b.dataset.v; bZeichnen();
   });
   $m("ab-tage").addEventListener("click", e => { const b = e.target.closest("[data-zum-tag]"); if (b) bTagSetzen(b.dataset.zumTag); });
+  $m("so-tage").addEventListener("click", e => { const b = e.target.closest("[data-zum-tag]"); if (b) bTagSetzen(b.dataset.zumTag); });
+  $m("so-raster").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    B.so.raster = b.dataset.v; try { localStorage.setItem("so-raster", B.so.raster); } catch (_) {} bSonne();
+  });
   const fpSetzen = () => { const v = $m("fp-von").value, b = $m("fp-bis").value; if (!v || !b) return; B.fp.von = v; B.fp.bis = b; B.fp.eigen = true; bFlexPreis(); };
   $m("fp-von").addEventListener("change", fpSetzen);
   $m("fp-bis").addEventListener("change", fpSetzen);

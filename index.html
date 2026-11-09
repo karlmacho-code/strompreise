@@ -315,6 +315,31 @@
         <div class="chart" id="pv-c-bat" style="height:260px"></div>
         <div class="tbl" id="t-pv-c-bat" hidden></div>
       </article>
+      <article class="card">
+        <header><h2>Sonnenstunden <span class="date">Station Poysdorf Ost, GeoSphere</span></h2>
+          <div class="row tight"><div class="seg" id="so-raster" role="radiogroup" aria-label="Raster"><button type="button" data-v="tag" aria-checked="false">Tag</button><button type="button" data-v="woche" aria-checked="false">Woche</button><button type="button" data-v="monat" aria-checked="true">Monat</button></div><button class="tbl-btn" data-tbl="so-c-sonne" type="button">Tabelle</button></div></header>
+        <p class="note" id="n-so-c-sonne"></p>
+        <div class="chart" id="so-c-sonne" style="height:260px"></div>
+        <div class="tbl" id="t-so-c-sonne" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>PV-Ertrag im Vergleich <span class="date">gemessen und aus der Globalstrahlung erwartet</span></h2><button class="tbl-btn" data-tbl="so-c-pv" type="button">Tabelle</button></header>
+        <p class="note" id="n-so-c-pv"></p>
+        <div class="chart" id="so-c-pv" style="height:260px"></div>
+        <div class="tbl" id="t-so-c-pv" hidden></div>
+      </article>
+      <div class="grid2 mb">
+        <article class="card">
+          <header><h2>Ertrag je Tag gegen Sonnenstunden <span class="date">ein Punkt je Tag</span></h2></header>
+          <div class="chart" id="so-c-streu" style="height:280px"></div>
+        </article>
+        <article class="card">
+          <header><h2>Auffällige Tage <span class="date">Ertrag weit unter Erwartung</span></h2></header>
+          <div class="tbl" id="so-tage"></div>
+          <p class="note fein">Erwartung = Globalstrahlung × Anlagenfaktor (aus deinen Daten geschätzt). Deutlich zu wenig Ertrag bei viel Strahlung deutet auf Schnee, Abschattung, Abregelung oder Ausfall hin.
+            Quelle Wetterdaten: GeoSphere Austria, Datensatz klima-v2-1d, Station Poysdorf Ost (ca. 8 km), CC BY 4.0. Sonnenscheindauer wird ab 120 W/m² Direktstrahlung gezählt; diffuse Strahlung liefert auch ohne „Sonnenstunde“ Ertrag.</p>
+        </article>
+      </div>
       </section>
 
       <!-- Wallboxen -->

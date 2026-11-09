@@ -180,3 +180,6 @@ code { font-size: 12px; background: var(--accent-wash); padding: 1px 5px; border
 .ms-sec.laedt { opacity: .5; transition: opacity .2s; pointer-events: none; }
 .fp-ctl { margin: 8px 0 4px; }
 .fp-ctl .linkish { margin-left: auto; }
+.card > header .seg { padding: 2px; }
+.card > header .seg button { padding: 4px 9px; font-size: 12px; }
+.row.so-note { margin: 0 0 6px; }

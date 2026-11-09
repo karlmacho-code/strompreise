@@ -6,3 +6,4 @@ rohdaten/
 __pycache__/
 .claude/
 supabase/.temp/
+auswertung/

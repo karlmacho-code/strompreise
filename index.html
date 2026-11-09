@@ -280,9 +280,18 @@
       <section class="ms-sec" data-sec="netz" hidden>
         <div class="kpis" id="nz-kpis"></div>
       <article class="card">
-        <header><h2>Bezug und Einspeisung <span class="date">kWh je Monat, Netz NÖ</span></h2><button class="tbl-btn" data-tbl="nz-c-monat" type="button">Tabelle</button></header>
+        <header><h2>Bezug und Einspeisung <span class="date" id="nz-einheit">kWh je Monat, Netz NÖ</span></h2>
+          <div class="row tight"><div class="seg" id="nz-raster" role="radiogroup" aria-label="Raster"><button type="button" data-v="stunde" aria-checked="false">Stunde</button><button type="button" data-v="tag" aria-checked="false">Tag</button><button type="button" data-v="woche" aria-checked="false">Woche</button><button type="button" data-v="monat" aria-checked="true">Monat</button></div><button class="tbl-btn" data-tbl="nz-c-monat" type="button">Tabelle</button></div></header>
         <div class="chart" id="nz-c-monat" style="height:280px"></div>
         <div class="tbl" id="t-nz-c-monat" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>Netzspitzen <span class="date">Viertelstunden über der Schwelle</span></h2>
+          <div class="row tight"><label class="field">über <input type="number" id="nz-schwelle" class="date-in" min="1" max="40" step="0.5" value="10" style="width:5.5em"> kW</label><button class="tbl-btn" data-tbl="nz-c-spitzen" type="button">Tabelle</button></div></header>
+        <p class="note" id="n-nz-c-spitzen"></p>
+        <div class="chart" id="nz-c-spitzen" style="height:300px"></div>
+        <div class="tbl" id="t-nz-c-spitzen" hidden></div>
+        <div class="chart" id="nz-c-spitzen-monat" style="height:200px"></div>
       </article>
       <article class="card">
         <header><h2>Wann du Strom aus dem Netz holst <span class="date">kWh je Stunde</span></h2><button class="tbl-btn" data-tbl="nz-c-heat" type="button">Tabelle</button></header>

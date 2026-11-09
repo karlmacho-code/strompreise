@@ -615,3 +615,14 @@ as $$
 $$;
 revoke all on function public.tag_alle_json(date) from public, anon;
 grant execute on function public.tag_alle_json(date) to authenticated;
+
+-- Netzspitzen: alle Viertelstunden mit Netzbezug über einer Schwelle (kW) als [unix_sekunden, kw]
+create or replace function public.netz_spitzen_json(von timestamptz, bis timestamptz, min_kw real)
+returns jsonb language sql stable security invoker set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_array(extract(epoch from ts_start)::bigint, round((kwh * 4)::numeric, 2)) order by ts_start), '[]'::jsonb)
+  from public.netz_15min
+  where richtung = 'bezug' and ts_start >= von and ts_start < bis and kwh * 4 > min_kw
+$$;
+revoke all on function public.netz_spitzen_json(timestamptz, timestamptz, real) from public, anon;
+grant execute on function public.netz_spitzen_json(timestamptz, timestamptz, real) to authenticated;

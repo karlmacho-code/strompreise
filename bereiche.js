@@ -297,13 +297,36 @@ async function bNetz() {
 
   const M = monatsListe(T);
   if (!M.length) { keineDaten("nz-c-monat"); keineDaten("nz-c-heat"); keineDaten("nz-c-profil"); return; }
-  let o = oben(base()); monatsAchse(o, M); o.tooltip.formatter = monatsTip(M, v => nk(v) + " kWh");
-  o.yAxis.axisLabel.formatter = v => nf0.format(Math.abs(v));
-  o.series = [saeule("Bezug", M.map(e => r1(summe(e.tage, t => t.nb))), FB.netz, "x", true),
-    saeule("Einspeisung", M.map(e => { const v = summe(e.tage, t => t.ne); return v == null ? null : -r1(v); }), FB.einsp, "x", false)];
+  // Bezug/Einspeisung im wählbaren Raster (Stunde/Tag/Woche/Monat) aus den Netz-NÖ-Stundenwerten
+  const r = B.nz.raster;
+  $m("nz-raster").querySelectorAll("button").forEach(b => b.setAttribute("aria-checked", b.dataset.v === r));
+  const G = new Map(); const GL = [];
+  for (const [ts, b, e] of H) {
+    const L = local(ts); let k, l, lang;
+    if (r === "stunde") { k = ts; l = `${pad2(L.d)}.${pad2(L.m + 1)} ${hh(L.h)}`; lang = `${dateStr(L.y, L.m, L.d)}, ${hh(L.h)}–${hh((L.h + 1) % 24)}`; }
+    else if (r === "tag") { k = dayKey(L.y, L.m, L.d); l = `${pad2(L.d)}.${pad2(L.m + 1)}.${String(L.y).slice(2)}`; lang = `${WOCHENTAGE[new Date(L.y, L.m, L.d).getDay()]}, ${dateStr(L.y, L.m, L.d)}`; }
+    else if (r === "woche") { const w = isoWoche(L.y, L.m, L.d); k = w.j * 100 + w.kw; l = `KW ${w.kw}`; lang = `KW ${w.kw}/${w.j}`; }
+    else { k = L.y * 12 + L.m; l = `${MONATE[L.m]} ${String(L.y).slice(2)}`; lang = `${MONATE_LANG[L.m]} ${L.y}`; }
+    let g = G.get(k); if (!g) { g = { k, l, lang, L, b: 0, e: 0, n: 0 }; G.set(k, g); GL.push(g); }
+    g.b += b; g.e += e; g.n++;
+  }
+  let o = oben(base());
+  o.xAxis.data = GL.map(g => g.l);
+  if (r === "monat") monatsAchse(o, GL.map(g => ({ ttl: g.l, m: g.L.m, y: g.L.y })));
+  else if (r === "woche") { o.xAxis.axisLabel.interval = GL.length > 30 ? (i => GL[i].L.d <= 7 && GL[i].L.m % (GL.length > 80 ? 3 : 1) === 0) : "auto"; if (GL.length > 30) o.xAxis.axisLabel.formatter = (v, i) => `${MONATE[GL[i].L.m]} ${String(GL[i].L.y).slice(2)}`; }
+  else if (r === "tag") { o.xAxis.axisLabel.interval = GL.length > 120 ? (i => GL[i].L.d === 1 && GL[i].L.m % 3 === 0) : GL.length > 40 ? (i => GL[i].L.d === 1) : "auto"; if (GL.length > 40) o.xAxis.axisLabel.formatter = (v, i) => `${MONATE[GL[i].L.m]} ${String(GL[i].L.y).slice(2)}`; }
+  else { o.xAxis.axisLabel.interval = i => GL[i].L.h === 0 && (GL.length > 2000 ? GL[i].L.d === 1 : GL.length > 400 ? GL[i].L.d % 7 === 1 : true); o.xAxis.axisLabel.formatter = (v, i) => GL.length > 2000 ? `${MONATE[GL[i].L.m]} ${String(GL[i].L.y).slice(2)}` : `${pad2(GL[i].L.d)}.${pad2(GL[i].L.m + 1)}.`; }
+  if (GL.length > 62) { o.grid.bottom = 44; o.dataZoom = [{ type: "inside" }, { type: "slider", height: 18, bottom: 6, borderColor: css("--border"), fillerColor: css("--accent-wash"), handleStyle: { color: css("--surface"), borderColor: css("--axis") }, textStyle: { color: css("--muted"), fontSize: 11 }, dataBackground: { lineStyle: { color: css("--axis") }, areaStyle: { color: css("--grid") } } }]; }
+  const einh = r === "stunde" ? "kW" : "kWh";
+  o.tooltip.formatter = ps => `<b>${GL[ps[0].dataIndex].lang}</b><br>` + ps.filter(p => p.value != null).map(p => `${punkt(p.color)}${p.seriesName}: ${r === "stunde" ? n2(Math.abs(p.value)) : nk(Math.abs(p.value))} ${einh}`).join("<br>");
+  o.yAxis.axisLabel.formatter = v => (r === "stunde" ? nf1 : nf0).format(Math.abs(v));
+  const bw = r === "monat" ? 36 : r === "woche" ? 18 : 10;
+  o.series = [{ ...saeule("Bezug", GL.map(g => r === "stunde" ? r3(g.b) : r1(g.b)), FB.netz, "x", true), barMaxWidth: bw, barCategoryGap: GL.length > 200 ? "5%" : "20%", large: true },
+    { ...saeule("Einspeisung", GL.map(g => -(r === "stunde" ? r3(g.e) : r1(g.e))), FB.einsp, "x", false), barMaxWidth: bw, large: true }];
   chart("nz-c-monat", o);
-  setTable("nz-c-monat", ["Monat", "Tage", "Bezug kWh", "Einspeisung kWh", "Ø Bezug je Tag"],
-    M.map(e => [e.ttl, e.tage.length, nk(summe(e.tage, t => t.nb)), nk(summe(e.tage, t => t.ne)), n1(summe(e.tage, t => t.nb) / e.tage.length)]));
+  $m("nz-einheit").textContent = r === "stunde" ? "kWh je Stunde, Netz NÖ" : r === "tag" ? "kWh je Tag, Netz NÖ" : r === "woche" ? "kWh je Woche, Netz NÖ" : "kWh je Monat, Netz NÖ";
+  setTable("nz-c-monat", [r === "stunde" ? "Stunde" : r === "tag" ? "Tag" : r === "woche" ? "Woche" : "Monat", "Bezug kWh", "Einspeisung kWh", r === "stunde" ? "Saldo kWh" : "Ø Bezug je Tag"],
+    GL.map(g => [g.lang, r === "stunde" ? n2(g.b) : nk(g.b), r === "stunde" ? n2(g.e) : nk(g.e), r === "stunde" ? n2(g.b - g.e) : n1(g.b / Math.max(1, g.n / 24))]));
 
   // Heatmap Monat × Stunde (Ø kWh je Stunde)
   const acc = new Map(), zeilen = new Map();
@@ -343,6 +366,53 @@ async function bNetz() {
   o.series = [saeule("Bezug", ph.map(x => x[2] ? r3(x[0] / x[2]) : null), FB.netz, "x", true), saeule("Einspeisung", ph.map(x => x[2] ? -r3(x[1] / x[2]) : null), FB.einsp, "x", false)];
   chart("nz-c-profil", o);
   setTable("nz-c-profil", ["Stunde", "Ø Bezug kWh", "Ø Einspeisung kWh"], ph.map((x, h) => [hh(h), n2(x[2] ? x[0] / x[2] : null), n2(x[2] ? x[1] / x[2] : null)]));
+}
+
+// ---------- Netzspitzen über einer einstellbaren Schwelle ----------
+B.nzS = { schwelle: 10, cache: new Map() };
+try { const v = parseFloat(localStorage.getItem("nz-schwelle")); if (v > 0) B.nzS.schwelle = v; } catch (_) {}
+async function bSpitzen() {
+  const s = B.nzS.schwelle; $m("nz-schwelle").value = s;
+  const [von, bis] = bGrenzen(), key = `${von}-${bis}-${s}`;
+  if (!B.nzS.cache.has(key)) {
+    const r = await MS.sb.rpc("netz_spitzen_json", { von: new Date(von * 1000).toISOString(), bis: new Date(bis * 1000).toISOString(), min_kw: s });
+    if (r.error) { $m("n-nz-c-spitzen").textContent = r.error.message; return; }
+    B.nzS.cache.set(key, r.data || []);
+  }
+  const P = B.nzS.cache.get(key).map(([ts, kw]) => ({ ts, kw, L: local(ts), min: new Date(ts * 1000).getUTCMinutes() }));
+  const T = bTage().filter(t => t.nb != null);
+  const monate = []; const seen = new Set();
+  for (const t of T) { const k = t.y * 12 + t.m; if (!seen.has(k)) { seen.add(k); monate.push({ k, y: t.y, m: t.m, ttl: `${MONATE[t.m]} ${String(t.y).slice(2)}`, n: 0, max: 0, tage: new Set(), kwh: 0 }); } }
+  const MM = new Map(monate.map(e => [e.k, e]));
+  for (const p of P) { const e = MM.get(p.L.y * 12 + p.L.m); if (!e) continue; e.n++; e.max = Math.max(e.max, p.kw); e.tage.add(p.L.d); e.kwh += (p.kw - s) / 4; }
+  let phasen = 0, laengste = 0, lauf = 0, prev = null;
+  for (const p of P) { if (prev != null && p.ts - prev === 900) lauf++; else { if (prev != null) { phasen++; laengste = Math.max(laengste, lauf); } lauf = 1; } prev = p.ts; }
+  if (prev != null) { phasen++; laengste = Math.max(laengste, lauf); }
+  const tage = new Set(P.map(p => `${p.L.y}-${p.L.m}-${p.L.d}`)).size;
+  $m("n-nz-c-spitzen").textContent = P.length
+    ? `${zeitText()}: ${nf0.format(P.length)} Viertelstunden über ${nf1.format(s)} kW an ${tage} Tagen, in ${phasen} zusammenhängenden Phasen (längste ${laengste * 15} min). Höchster Wert ${n1(Math.max(...P.map(p => p.kw)))} kW. Energie oberhalb der Schwelle: ${nk(P.reduce((a, p) => a + (p.kw - s) / 4, 0))} kWh.`
+    : `${zeitText()}: keine Viertelstunde über ${nf1.format(s)} kW.`;
+  let o = base(); o.tooltip.trigger = "item"; o.tooltip.axisPointer = undefined;
+  o.grid = { left: 8, right: 16, top: 30, bottom: P.length > 300 ? 44 : 8, containLabel: true };
+  o.xAxis = { type: "time", min: von * 1000, max: bis * 1000, axisLabel: { color: css("--muted"), fontSize: 11, formatter: v => { const d = new Date(v); return `${MONATE[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`; } }, axisLine: { lineStyle: { color: css("--axis") } }, splitLine: { show: false } };
+  o.yAxis.min = Math.floor(s); o.yAxis.name = "kW"; o.yAxis.nameTextStyle = { color: css("--muted"), fontSize: 11 };
+  o.tooltip.formatter = p => p.seriesType !== "scatter" ? "" : `<b>${WOCHENTAGE[new Date(p.data[0]).getDay()]}, ${dateStr(p.data[3].y, p.data[3].m, p.data[3].d)} ${pad2(p.data[3].h)}:${pad2(p.data[2])}</b><br>${n1(p.data[1])} kW`;
+  const nacht = p => p.L.h < 6 || p.L.h >= 22, abend = p => p.L.h >= 17 && p.L.h < 22;
+  const pts = f => P.filter(f).map(p => [p.ts * 1000, p.kw, p.min, p.L]);
+  o.series = [
+    { type: "scatter", name: "Tag 6–17 Uhr", data: pts(p => !nacht(p) && !abend(p)), symbolSize: 6, itemStyle: { color: css(FB.pv), opacity: .8 } },
+    { type: "scatter", name: "Abend 17–22 Uhr", data: pts(abend), symbolSize: 6, itemStyle: { color: css(FB.einsp), opacity: .8 } },
+    { type: "scatter", name: "Nacht 22–6 Uhr", data: pts(nacht), symbolSize: 6, itemStyle: { color: css(FB.netz), opacity: .8 } },
+    { type: "line", name: "Schwelle", data: [[von * 1000, s], [bis * 1000, s]], showSymbol: false, silent: true, lineStyle: { color: css("--text-2"), width: 1, type: "dashed" } },
+  ];
+  o.legend = { top: 0, left: 0, icon: "circle", itemWidth: 8, itemHeight: 8, textStyle: { color: css("--text-2"), fontSize: 12 }, data: ["Tag 6–17 Uhr", "Abend 17–22 Uhr", "Nacht 22–6 Uhr"] };
+  if (P.length > 300) o.dataZoom = [{ type: "inside" }, { type: "slider", height: 18, bottom: 6, borderColor: css("--border"), fillerColor: css("--accent-wash"), handleStyle: { color: css("--surface"), borderColor: css("--axis") }, textStyle: { color: css("--muted"), fontSize: 11 } }];
+  chart("nz-c-spitzen", o);
+  setTable("nz-c-spitzen", ["Zeit", "kW", "Wochentag"], P.map(p => [`${dateStr(p.L.y, p.L.m, p.L.d)} ${pad2(p.L.h)}:${pad2(p.min)}`, n1(p.kw), WOCHENTAGE_LANG[new Date(p.L.y, p.L.m, p.L.d).getDay()]]));
+  o = oben(base()); o.grid.top = window.innerWidth < 600 ? 56 : 30; monatsAchse(o, monate);
+  o.tooltip.formatter = ps => { const e = monate[ps[0].dataIndex]; return `<b>${MONATE_LANG[e.m]} ${e.y}</b><br>${e.n} Viertelstunden über ${nf1.format(s)} kW an ${e.tage.size} Tagen<br>Monatsmaximum ${n1(e.max)} kW · ${nk(e.kwh)} kWh oberhalb`; };
+  o.series = [{ ...saeule(`Viertelstunden über ${nf1.format(s)} kW`, monate.map(e => e.n), FB.netz), barMaxWidth: 28 }];
+  chart("nz-c-spitzen-monat", o);
 }
 
 // ---------- Bereich: PV und Batterie ----------
@@ -392,6 +462,8 @@ function bPV() {
 
 // ---------- Sonnenstunden (GeoSphere Poysdorf Ost) und Abgleich mit dem PV-Ertrag ----------
 B.so = { raster: "monat", daten: null };
+B.nz = { raster: "monat" };
+try { B.nz.raster = localStorage.getItem("nz-raster") || "monat"; } catch (_) {}
 try { B.so.raster = localStorage.getItem("so-raster") || "monat"; } catch (_) {}
 async function soLaden() {
   if (B.so.daten === null) {
@@ -775,7 +847,7 @@ async function bTag() {
 }
 
 // ---------- Navigation ----------
-const BR = { uebersicht: bUebersicht, abgleich: bAbgleich, netz: bNetz, pv: async () => { bPV(); await bSonne(); }, wallbox: bWallbox, kosten: bKosten, tag: bTag, verwaltung: () => {} };
+const BR = { uebersicht: bUebersicht, abgleich: bAbgleich, netz: async () => { await bNetz(); await bSpitzen(); }, pv: async () => { bPV(); await bSonne(); }, wallbox: bWallbox, kosten: bKosten, tag: bTag, verwaltung: () => {} };
 function bZeichnen() {
   if (!B.tage) return;
   if (!BR[B.sec]) B.sec = "uebersicht";
@@ -810,6 +882,11 @@ function bInit() {
   });
   $m("ab-tage").addEventListener("click", e => { const b = e.target.closest("[data-zum-tag]"); if (b) bTagSetzen(b.dataset.zumTag); });
   $m("so-tage").addEventListener("click", e => { const b = e.target.closest("[data-zum-tag]"); if (b) bTagSetzen(b.dataset.zumTag); });
+  $m("nz-schwelle").addEventListener("change", e => { const v = parseFloat(e.target.value); if (v > 0) { B.nzS.schwelle = v; try { localStorage.setItem("nz-schwelle", v); } catch (_) {} bSpitzen(); } });
+  $m("nz-raster").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    B.nz.raster = b.dataset.v; try { localStorage.setItem("nz-raster", B.nz.raster); } catch (_) {} bZeichnen();
+  });
   $m("so-raster").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     B.so.raster = b.dataset.v; try { localStorage.setItem("so-raster", B.so.raster); } catch (_) {} bSonne();

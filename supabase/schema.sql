@@ -370,13 +370,16 @@ begin
   on conflict (ts) do nothing;
 
   insert into public.flex_preise (ts_start, ts_ende, bezug_ct_netto, einspeise_ct_netto, tarif, abgerufen)
-  select (p->>'startt')::timestamptz, (p->>'endt')::timestamptz, (p->>'cons')::real / 10, (p->>'gen')::real / 10,
+  select distinct on ((p->>'startt')::timestamptz)            -- mehrere Antworten: je Viertelstunde die neueste
+         (p->>'startt')::timestamptz, (p->>'endt')::timestamptz, (p->>'cons')::real / 10, (p->>'gen')::real / 10,
          (select name from public.tarif where art = 'flex' order by gueltig_ab desc limit 1), now()
   from private.ef_anfragen q
   join net._http_response r on r.id = q.id
   cross join lateral (select private.try_jsonb(r.content) j) x
   cross join lateral jsonb_array_elements(case when jsonb_typeof(x.j->'data') = 'array' then x.j->'data' else '[]'::jsonb end) p
   where q.art = 'preise' and r.status_code = 200 and (x.j->>'bSuccess')::boolean is true
+    and nullif(p->>'cons', '') is not null and nullif(p->>'gen', '') is not null   -- noch offene Viertelstunden kommen leer
+  order by (p->>'startt')::timestamptz, r.created desc
   on conflict (ts_start) do update set bezug_ct_netto = excluded.bezug_ct_netto,
     einspeise_ct_netto = excluded.einspeise_ct_netto, ts_ende = excluded.ts_ende, abgerufen = now();
 
@@ -507,3 +510,53 @@ as $$
 $$;
 revoke all on function public.netz_stunden_json(timestamptz, timestamptz) from public, anon;
 grant execute on function public.netz_stunden_json(timestamptz, timestamptz) to authenticated;
+
+-- =====================================================================
+-- Täglicher Statusbericht per E-Mail (Edge Function "bericht")
+-- Empfänger steht nur in der Datenbank: sync_einstellung 'bericht_empfaenger'
+-- Versand über Resend (Secret RESEND_API_KEY)
+-- =====================================================================
+create table if not exists public.bericht_versand (
+  id        bigint generated always as identity primary key,
+  gesendet  timestamptz not null default now(),
+  ausloeser text,
+  ok        boolean not null,
+  betreff   text,
+  antwort   text
+);
+alter table public.bericht_versand enable row level security;
+revoke all on public.bericht_versand from anon, authenticated;
+grant all on public.bericht_versand to service_role;
+
+create or replace function public.bericht_json()
+returns jsonb language sql stable security definer set search_path = ''
+as $$
+  select jsonb_build_object(
+    'laeufe', (select coalesce(jsonb_agg(to_jsonb(l) order by l.gestartet), '[]'::jsonb)
+               from public.sync_lauf l where l.gestartet > now() - interval '26 hours'),
+    'netz_bis', (select jsonb_object_agg(richtung, bis) from (select richtung, max(ts_start) bis from public.netz_15min group by richtung) n),
+    'pv_15min_bis', (select max(ts_start) from public.pv_15min),
+    'pv_tag_bis', (select max(tag) from public.pv_tag),
+    'laden_letzte', (select max(start) from public.laden),
+    'flex_bis', (select max(ts_start) from public.flex_preise),
+    'live_letzter', (select max(ts) from public.live_werte),
+    'cron', (select jsonb_object_agg(jobname, active) from cron.job),
+    'cron_fehler', (select coalesce(jsonb_object_agg(jobname, n), '{}'::jsonb) from (
+                      select j.jobname, count(*) n from cron.job_run_details d join cron.job j using (jobid)
+                      where d.start_time > now() - interval '24 hours' and d.status = 'failed' group by 1) f),
+    'empfaenger', (select wert from public.sync_einstellung where schluessel = 'bericht_empfaenger'),
+    'letzter_versand', (select max(gesendet) from public.bericht_versand where ok and ausloeser = 'zeitplan')
+  )
+$$;
+revoke all on function public.bericht_json() from public, anon, authenticated;
+grant execute on function public.bericht_json() to service_role;
+
+-- Zeitplan: täglich 05:50 UTC (06:50 Winter- bzw. 07:50 Sommerzeit), nach dem Morgen-Sync um 05:20
+select cron.unschedule(jobid) from cron.job where jobname = 'bericht-taeglich';
+select cron.schedule('bericht-taeglich', '50 5 * * *', $$
+  select net.http_post(
+    url := 'https://kdwrfhcflewvmuegmgwm.supabase.co/functions/v1/bericht',
+    headers := '{"Content-Type": "application/json"}'::jsonb,
+    body := '{"ausloeser": "zeitplan"}'::jsonb,
+    timeout_milliseconds := 10000)
+$$);

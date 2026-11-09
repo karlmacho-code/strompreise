@@ -4,3 +4,7 @@ project_id = "strompreise"
 [functions.sync]
 # Der Zeitplan ruft ohne Anmeldung auf; die Funktion prüft selbst (Sperrzeit, Benutzer-Token).
 verify_jwt = false
+
+[functions.bericht]
+# Zeitplan ohne Anmeldung; höchstens eine Mail pro 20 h, Test aus der App mit Benutzer-Token.
+verify_jwt = false

@@ -26,7 +26,7 @@ const TARIFE_BEZUG = [
     stunde: (p) => (p + 1.5) * UST, info: "Börse + 1,50 ct netto; 5,75 €/Monat" },
   { id: "evn_sonne", name: "EVN Optima Garant Sonne", gebuehrMonat: 7.2,
     stunde: (p, L) => ((L.m >= 3 && L.m <= 8 && L.h >= 10 && L.h < 16) ? 6.9 : 10.5) * UST,
-    info: "Fix 10,50 ct netto, Apr–Sep 10–16 Uhr 6,90 ct; 72 € netto/Jahr; 12 Monate Bindung, Angebot prüfen" },
+    info: "Fix 10,50 ct netto, Apr–Sep 10–16 Uhr 6,90 ct; 72 € netto/Jahr (Preisblatt 28.10.2026, Angebot bis 30.11.2026); gilt 12 Monate, danach Gleitklausel Optima Aktiv (derzeit ≈ 20,36 ct)" },
 ];
 
 const TARIFE_EINSPEISUNG = [

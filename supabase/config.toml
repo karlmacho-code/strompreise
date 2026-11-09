@@ -1,0 +1,6 @@
+# Minimale Supabase-CLI-Konfiguration für das Bereitstellen der Edge Function
+project_id = "strompreise"
+
+[functions.sync]
+# Der Zeitplan ruft ohne Anmeldung auf; die Funktion prüft selbst (Sperrzeit, Benutzer-Token).
+verify_jwt = false

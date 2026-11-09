@@ -448,7 +448,7 @@ async function init() {
   document.getElementById("s-period").addEventListener("change", e => { S.sPeriod = e.target.value; rerender(); });
   document.getElementById("s-thresh").addEventListener("change", e => { S.sThresh = +e.target.value; rerender(); });
   document.getElementById("h-year").addEventListener("change", e => { S.hYear = e.target.value; rerender(); });
-  document.querySelectorAll(".tbl-btn").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".tbl-btn[data-tbl]").forEach(b => b.addEventListener("click", () => {
     const box = document.getElementById("t-" + b.dataset.tbl); box.hidden = !box.hidden; b.setAttribute("aria-pressed", !box.hidden); if (!box.hidden) renderTable(b.dataset.tbl);
   }));
   window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));

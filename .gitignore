@@ -5,3 +5,4 @@ rohdaten/
 .DS_Store
 __pycache__/
 .claude/
+supabase/.temp/

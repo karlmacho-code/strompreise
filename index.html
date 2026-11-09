@@ -36,6 +36,7 @@
   <a role="tab" href="#profil" data-tab="profil">Tagesprofil</a>
   <a role="tab" href="#heatmap" data-tab="heatmap">Heatmap</a>
   <a role="tab" href="#statistik" data-tab="statistik">Statistik</a>
+  <a role="tab" href="#mein" data-tab="mein" class="tab-mein"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Mein Strom</a>
 </nav>
 
 <main id="main">
@@ -157,6 +158,115 @@
       <div class="records" id="records"></div>
     </article>
   </section>
+
+  <!-- MEIN STROM (Login) -->
+  <section id="tab-mein" class="tab" hidden>
+    <div id="ms-nocfg" class="card narrow" hidden>
+      <header><h2>Persönlicher Bereich</h2></header>
+      <p class="note">Noch nicht eingerichtet: Die Verbindung zur Datenbank (Supabase) fehlt in <code>config.js</code>.</p>
+    </div>
+
+    <div id="ms-login" class="card narrow auth" hidden>
+      <header><h2>Anmelden</h2></header>
+      <p class="note">Deine Verbrauchsdaten sind privat und nur nach Anmeldung sichtbar.</p>
+      <form id="ms-login-form" autocomplete="on">
+        <label>E-Mail<input id="ms-email" type="email" autocomplete="username" required></label>
+        <label>Passwort<input id="ms-pw" type="password" autocomplete="current-password" required></label>
+        <button class="primary" type="submit">Anmelden</button>
+        <button class="linkish" type="button" id="ms-forgot">Passwort vergessen?</button>
+        <p id="ms-login-msg" class="msg"></p>
+      </form>
+    </div>
+
+    <div id="ms-newpw" class="card narrow auth" hidden>
+      <header><h2>Neues Passwort festlegen</h2></header>
+      <form id="ms-newpw-form">
+        <label>Neues Passwort<input id="ms-newpw1" type="password" autocomplete="new-password" minlength="12" required></label>
+        <label>Wiederholen<input id="ms-newpw2" type="password" autocomplete="new-password" minlength="12" required></label>
+        <button class="primary" type="submit">Speichern</button>
+        <p id="ms-newpw-msg" class="msg"></p>
+      </form>
+    </div>
+
+    <div id="ms-app" hidden>
+      <div class="row between">
+        <p class="hint" id="ms-stand"></p>
+        <div class="row tight">
+          <span class="hint" id="ms-user"></span>
+          <button class="tbl-btn" id="ms-reload" type="button">Neu laden</button>
+          <button class="tbl-btn" id="ms-logout" type="button">Abmelden</button>
+        </div>
+      </div>
+      <div class="sync" id="ms-sync"><span id="ms-sync-txt">Abruf: –</span><button class="tbl-btn" id="ms-sync-btn" type="button">Jetzt abrufen</button></div>
+      <p id="ms-app-msg" class="msg"></p>
+      <div class="kpis" id="ms-kpis"></div>
+
+      <article class="card">
+        <header><h2>Bezug je Monat <span class="date">kWh</span></h2><button class="tbl-btn" data-tbl="ms-c-bezug">Tabelle</button></header>
+        <div class="chart" id="ms-c-bezug" style="height:280px"></div>
+        <div class="tbl" id="t-ms-c-bezug" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>Energiekosten je Monat <span class="date">€ brutto, nur Energie</span></h2><button class="tbl-btn" data-tbl="ms-c-kosten">Tabelle</button></header>
+        <p class="note" id="ms-n-kosten"></p>
+        <div class="chart" id="ms-c-kosten" style="height:280px"></div>
+        <div class="tbl" id="t-ms-c-kosten" hidden></div>
+      </article>
+      <article class="card" id="tv-card">
+        <header><h2>Tarifvergleich <span class="date">mit deinen Netz-NÖ-Werten</span></h2>
+          <select id="tv-zeit" aria-label="Zeitraum"></select></header>
+        <p class="note" id="tv-note"></p>
+        <h3 class="sub3">Bezug: Energiekosten + Grundgebühr, brutto</h3>
+        <div class="chart" id="tv-c-bezug" style="height:330px"></div>
+        <button class="tbl-btn" data-tbl="tv-c-bezug" type="button">Tabelle Bezug</button>
+        <div class="tbl" id="t-tv-c-bezug" hidden></div>
+        <h3 class="sub3">Einspeisung: Vergütung abzüglich Gebühr, netto</h3>
+        <div class="chart" id="tv-c-einsp" style="height:290px"></div>
+        <button class="tbl-btn" data-tbl="tv-c-einsp" type="button">Tabelle Einspeisung</button>
+        <div class="tbl" id="t-tv-c-einsp" hidden></div>
+        <p class="note fein">Rechnung: dein tatsächlicher Bezug und deine Einspeisung je Stunde (Netz NÖ, geeicht) × Tarifpreis der jeweiligen Stunde bzw. des Monats.
+          Netzkosten sind bei allen Lieferanten gleich und nicht enthalten. ÖSPI und PV-Marktwert sind aus den Börsenpreisen genähert.
+          Gleiches Verbrauchsverhalten angenommen – mit Spot-Tarif und gezieltem Laden ginge es günstiger. Tarifstand 08.11.2026, ohne Neukundenrabatte. Kein Angebot, keine Beratung.</p>
+      </article>
+      <article class="card">
+        <header><h2>Einspeisung je Monat <span class="date">kWh</span></h2><button class="tbl-btn" data-tbl="ms-c-einsp">Tabelle</button></header>
+        <p class="note">Vergütung nach Flex-Tarif: Börsenpreis inkl. USt minus 10 % (mindestens 2,28 ct) je Stunde. Bei niedrigen oder negativen Börsenpreisen kann sie negativ werden. Verkäufe an die Community sind nicht bewertet.</p>
+        <div class="chart" id="ms-c-einsp" style="height:280px"></div>
+        <div class="tbl" id="t-ms-c-einsp" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>Tag im Detail <span class="date">kWh je 15 min</span></h2><button class="tbl-btn" data-tbl="ms-c-tag">Tabelle</button></header>
+        <div class="row tight"><input type="date" id="ms-tag" class="date-in"><p class="note" id="ms-n-tag"></p></div>
+        <div class="chart" id="ms-c-tag" style="height:280px"></div>
+        <div class="tbl" id="t-ms-c-tag" hidden></div>
+      </article>
+
+      <div class="grid2">
+        <article class="card">
+          <header><h2>Daten importieren</h2></header>
+          <p class="note"><b>eFriends:</b> App → Menü → Downloads → „15-Min (json)“ je Monat. <b>Netz NÖ, FusionSolar, Monta:</b> die gesicherten Dateien (<code>netznoe_…</code>, <code>fusionsolar_…</code>, <code>monta_…json</code>, Ordner Downloads/Strom&amp;Co). Mehrere Dateien auf einmal möglich; vorhandene Werte werden überschrieben.</p>
+          <label class="file"><input type="file" id="ms-file" accept=".json,.csv,application/json,text/csv" multiple><span>Dateien wählen …</span></label>
+          <p id="ms-imp-msg" class="msg"></p>
+        </article>
+        <article class="card">
+          <header><h2>Tarif</h2></header>
+          <form id="ms-tarif-form" class="tarif">
+            <label>Gültig ab<input type="date" id="ms-t-ab" required></label>
+            <label>Tarifname (wie in der App)<input id="ms-t-name" required></label>
+            <label>Art<select id="ms-t-art"><option value="flex">Flex (Börse)</option><option value="fix">Fixpreis</option></select></label>
+            <label>Aufschlag %<input id="ms-t-auf" inputmode="decimal"></label>
+            <label>Mindestaufschlag ct brutto<input id="ms-t-min" inputmode="decimal"></label>
+            <label>Fixpreis ct netto (nur Fix)<input id="ms-t-bezug" inputmode="decimal"></label>
+            <label>Community Ø ct netto<input id="ms-t-comm" inputmode="decimal" placeholder="wie Lieferant"></label>
+            <label>Gebühren €/Monat brutto<input id="ms-t-grund" inputmode="decimal"></label>
+            <label>Vergleichs-Fixpreis ct netto<input id="ms-t-fix" inputmode="decimal"></label>
+            <button class="primary" type="submit">Speichern</button>
+            <p id="ms-t-msg" class="msg"></p>
+          </form>
+        </article>
+      </div>
+    </div>
+  </section>
 </main>
 
 <footer class="foot">
@@ -166,6 +276,10 @@
   Seit 01.10.2025 ist der Stundenwert das Mittel der vier Viertelstunden.</p>
   <p>Quellen: smartENERGY (bis 27.07.2025), Energy-Charts / Fraunhofer ISE mit Daten der Bundesnetzagentur | SMARD.de (CC BY 4.0). Aktualisierung täglich automatisch.</p>
 </footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
 <script src="app.js"></script>
+<script src="tarife.js"></script>
+<script src="mein.js"></script>
 </body>
 </html>

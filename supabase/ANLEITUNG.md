@@ -66,3 +66,20 @@ npx supabase@2.122.0 functions deploy sync --project-ref <ref> --no-verify-jwt -
   `MONTA_CLIENT_ID`, `MONTA_CLIENT_SECRET` (Monta Hub → Profil → Applications).
 - Nicht geheime Einstellungen in `public.sync_einstellung` (Cube-Name, Anlage, Server, Wallboxen) – nicht im Repo.
 - Ergebnis jedes Laufs: `public.sync_lauf` (in der App als Statuszeile; Mausüber zeigt Details/Fehler).
+
+## 9. Täglicher Statusbericht per E-Mail
+
+Die Edge Function `bericht` prüft jeden Morgen um 05:50 UTC (06:50 bzw. 07:50 Wiener Zeit) alle Quellen
+(Sync-Läufe, Netz NÖ, FusionSolar, Monta, eFriends-Preise und -Cube, Börsenpreise auf GitHub, Datenbank-Zeitpläne)
+und schickt eine Mail mit ✅ / ⚠️ / ❌ je Quelle.
+
+1. Konto bei [resend.com](https://resend.com) **mit der Empfängeradresse** anlegen (kostenlos, 3.000 Mails/Monat).
+   Ohne eigene Domain stellt Resend vom Absender `onboarding@resend.dev` nur an die Konto-Adresse zu – genau das wird gebraucht.
+2. Resend → **API Keys** → *Create API Key* (Permission: *Sending access*), Schlüssel kopieren.
+3. Supabase → Edge Functions → **Secrets** → `RESEND_API_KEY` = Schlüssel.
+4. Empfänger steht nur in der Datenbank:
+   `insert into public.sync_einstellung values ('bericht_empfaenger', '<adresse>') on conflict (schluessel) do update set wert = excluded.wert;`
+5. Testmail (höchstens 1× pro Stunde):
+   `curl -X POST https://<ref>.supabase.co/functions/v1/bericht -H "Content-Type: application/json" -d '{"ausloeser":"test"}'`
+
+Versandprotokoll: Tabelle `bericht_versand`.

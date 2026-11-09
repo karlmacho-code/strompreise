@@ -205,8 +205,166 @@
       </div>
       <div class="sync" id="ms-sync"><span id="ms-sync-txt">Abruf: –</span><button class="tbl-btn" id="ms-sync-btn" type="button">Jetzt abrufen</button></div>
       <p id="ms-app-msg" class="msg"></p>
-      <div class="kpis" id="ms-kpis"></div>
 
+      <div class="ms-bar">
+        <nav class="subtabs" id="ms-nav" aria-label="Bereiche">
+          <button type="button" data-sec="uebersicht">Übersicht</button>
+          <button type="button" data-sec="abgleich">Abgleich</button>
+          <button type="button" data-sec="netz">Netz</button>
+          <button type="button" data-sec="pv">PV und Batterie</button>
+          <button type="button" data-sec="wallbox">Wallboxen</button>
+          <button type="button" data-sec="kosten">Kosten und Börse</button>
+          <button type="button" data-sec="tag">Tag im Detail</button>
+          <button type="button" data-sec="verwaltung">Verwaltung</button>
+        </nav>
+        <label class="field" id="ms-zeit-feld">Zeitraum <select id="ms-zeit"></select></label>
+      </div>
+
+      <!-- Übersicht -->
+      <section class="ms-sec" data-sec="uebersicht" hidden>
+        <div class="kpis" id="ue-kpis"></div>
+      <article class="card">
+        <header><h2>Energiefluss <span class="date">kWh im Zeitraum</span></h2><button class="tbl-btn" data-tbl="ue-c-fluss" type="button">Tabelle</button></header>
+        <p class="note" id="n-ue-c-fluss"></p>
+        <div class="chart" id="ue-c-fluss" style="height:340px"></div>
+        <div class="tbl" id="t-ue-c-fluss" hidden></div>
+        <p class="note fein">PV-Erzeugung und Batterie: FusionSolar. Netzbezug und Einspeisung: Netz NÖ (geeicht), vor 11/2023 FusionSolar. Direkt verbraucht = Erzeugung − Einspeisung − Batterieladung. Wallboxen: Monta (seit 03/2026).</p>
+      </article>
+      <div class="grid2 mb">
+        <article class="card">
+          <header><h2>Woher kommt dein Strom <span class="date">kWh je Monat</span></h2><button class="tbl-btn" data-tbl="ue-c-woher" type="button">Tabelle</button></header>
+          <div class="chart" id="ue-c-woher" style="height:280px"></div>
+          <div class="tbl" id="t-ue-c-woher" hidden></div>
+        </article>
+        <article class="card">
+          <header><h2>Wohin geht dein PV-Strom <span class="date">kWh je Monat</span></h2><button class="tbl-btn" data-tbl="ue-c-wohin" type="button">Tabelle</button></header>
+          <div class="chart" id="ue-c-wohin" style="height:280px"></div>
+          <div class="tbl" id="t-ue-c-wohin" hidden></div>
+        </article>
+      </div>
+      </section>
+
+      <!-- Abgleich -->
+      <section class="ms-sec" data-sec="abgleich" hidden>
+        <div class="row">
+          <div class="seg" id="ab-art" role="radiogroup" aria-label="Messgröße"><button type="button" data-v="bezug" aria-checked="true">Bezug</button><button type="button" data-v="einsp" aria-checked="false">Einspeisung</button></div>
+          <p class="hint" id="ab-hint"></p>
+        </div>
+        <div class="kpis" id="ab-kpis"></div>
+      <article class="card">
+        <header><h2>Drei Messungen, gleiche Tage <span class="date">kWh je Monat</span></h2><button class="tbl-btn" data-tbl="ab-c-menge" type="button">Tabelle</button></header>
+        <p class="note" id="n-ab-c-menge"></p>
+        <div class="chart" id="ab-c-menge" style="height:300px"></div>
+        <div class="tbl" id="t-ab-c-menge" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>Abweichung zu Netz NÖ <span class="date">% je Monat</span></h2><button class="tbl-btn" data-tbl="ab-c-diff" type="button">Tabelle</button></header>
+        <p class="note" id="n-ab-c-diff"></p>
+        <div class="chart" id="ab-c-diff" style="height:260px"></div>
+        <div class="tbl" id="t-ab-c-diff" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>Datenabdeckung <span class="date">vollständige Tage je Monat</span></h2><button class="tbl-btn" data-tbl="ab-c-abd" type="button">Tabelle</button></header>
+        <p class="note" id="n-ab-c-abd"></p>
+        <div class="chart" id="ab-c-abd" style="height:240px"></div>
+        <div class="tbl" id="t-ab-c-abd" hidden></div>
+        <p class="note fein">Vollständig = alle Viertelstunden des Tages vorhanden (Netz NÖ, eFriends) bzw. Tageswert vorhanden (FusionSolar). Netz NÖ ist der geeichte Zähler und dient als Referenz.</p>
+      </article>
+      <article class="card">
+        <header><h2>Tage mit den größten Abweichungen <span class="date">kWh</span></h2></header>
+        <div class="tbl" id="ab-tage"></div>
+      </article>
+      </section>
+
+      <!-- Netz -->
+      <section class="ms-sec" data-sec="netz" hidden>
+        <div class="kpis" id="nz-kpis"></div>
+      <article class="card">
+        <header><h2>Bezug und Einspeisung <span class="date">kWh je Monat, Netz NÖ</span></h2><button class="tbl-btn" data-tbl="nz-c-monat" type="button">Tabelle</button></header>
+        <div class="chart" id="nz-c-monat" style="height:280px"></div>
+        <div class="tbl" id="t-nz-c-monat" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>Wann du Strom aus dem Netz holst <span class="date">kWh je Stunde</span></h2><button class="tbl-btn" data-tbl="nz-c-heat" type="button">Tabelle</button></header>
+        <p class="note" id="n-nz-c-heat"></p>
+        <div class="chart" id="nz-c-heat" style="height:360px"></div>
+        <div class="tbl" id="t-nz-c-heat" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>Typischer Tag <span class="date">Ø kWh je Stunde</span></h2><button class="tbl-btn" data-tbl="nz-c-profil" type="button">Tabelle</button></header>
+        <div class="chart" id="nz-c-profil" style="height:260px"></div>
+        <div class="tbl" id="t-nz-c-profil" hidden></div>
+      </article>
+      </section>
+
+      <!-- PV und Batterie -->
+      <section class="ms-sec" data-sec="pv" hidden>
+        <div class="kpis" id="pv-kpis"></div>
+      <article class="card">
+        <header><h2>PV-Ertrag im Jahresvergleich <span class="date">kWh je Monat, alle Jahre</span></h2><button class="tbl-btn" data-tbl="pv-c-jahre" type="button">Tabelle</button></header>
+        <div class="chart" id="pv-c-jahre" style="height:280px"></div>
+        <div class="tbl" id="t-pv-c-jahre" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>PV-Ertrag je Tag <span class="date">kWh</span></h2><button class="tbl-btn" data-tbl="pv-c-tage" type="button">Tabelle</button></header>
+        <div class="chart" id="pv-c-tage" style="height:260px"></div>
+        <div class="tbl" id="t-pv-c-tage" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>Batterie <span class="date">kWh je Monat</span></h2><button class="tbl-btn" data-tbl="pv-c-bat" type="button">Tabelle</button></header>
+        <div class="chart" id="pv-c-bat" style="height:260px"></div>
+        <div class="tbl" id="t-pv-c-bat" hidden></div>
+      </article>
+      </section>
+
+      <!-- Wallboxen -->
+      <section class="ms-sec" data-sec="wallbox" hidden>
+        <div class="kpis" id="wb-kpis"></div>
+      <article class="card">
+        <header><h2>Geladene Energie <span class="date">kWh je Monat</span></h2><button class="tbl-btn" data-tbl="wb-c-monat" type="button">Tabelle</button></header>
+        <div class="chart" id="wb-c-monat" style="height:280px"></div>
+        <div class="tbl" id="t-wb-c-monat" hidden></div>
+      </article>
+      <div class="grid2 mb">
+        <article class="card">
+          <header><h2>Ladebeginn nach Uhrzeit <span class="date">kWh</span></h2><button class="tbl-btn" data-tbl="wb-c-uhr" type="button">Tabelle</button></header>
+          <div class="chart" id="wb-c-uhr" style="height:260px"></div>
+          <div class="tbl" id="t-wb-c-uhr" hidden></div>
+        </article>
+        <article class="card">
+          <header><h2>Börsenpreis beim Laden <span class="date">Ø ct/kWh netto je Monat</span></h2><button class="tbl-btn" data-tbl="wb-c-preis" type="button">Tabelle</button></header>
+          <p class="note" id="n-wb-c-preis"></p>
+          <div class="chart" id="wb-c-preis" style="height:260px"></div>
+          <div class="tbl" id="t-wb-c-preis" hidden></div>
+        </article>
+      </div>
+      <article class="card">
+        <header><h2>Ladevorgänge <span class="date" id="wb-anzahl"></span></h2></header>
+        <div class="tbl" id="wb-liste"></div>
+      </article>
+      </section>
+
+      <!-- Kosten und Börse -->
+      <section class="ms-sec" data-sec="kosten" hidden>
+        <div class="kpis" id="ms-kpis"></div>
+      <article class="card">
+        <header><h2>Börsenpreis und dein Verbrauch <span class="date">Ø ct/kWh netto je Monat</span></h2><button class="tbl-btn" data-tbl="kb-c-preis" type="button">Tabelle</button></header>
+        <p class="note" id="n-kb-c-preis"></p>
+        <div class="chart" id="kb-c-preis" style="height:280px"></div>
+        <div class="tbl" id="t-kb-c-preis" hidden></div>
+      </article>
+      <div class="grid2 mb">
+        <article class="card">
+          <header><h2>Börsenpreis im Tagesverlauf <span class="date">Ø ct/kWh netto</span></h2><button class="tbl-btn" data-tbl="kb-c-tp" type="button">Tabelle</button></header>
+          <div class="chart" id="kb-c-tp" style="height:240px"></div>
+          <div class="tbl" id="t-kb-c-tp" hidden></div>
+        </article>
+        <article class="card">
+          <header><h2>Dein Bezug im Tagesverlauf <span class="date">Ø kWh je Stunde, Netz NÖ</span></h2><button class="tbl-btn" data-tbl="kb-c-tl" type="button">Tabelle</button></header>
+          <div class="chart" id="kb-c-tl" style="height:240px"></div>
+          <div class="tbl" id="t-kb-c-tl" hidden></div>
+        </article>
+      </div>
       <article class="card">
         <header><h2>Bezug je Monat <span class="date">kWh</span></h2><button class="tbl-btn" data-tbl="ms-c-bezug">Tabelle</button></header>
         <div class="chart" id="ms-c-bezug" style="height:280px"></div>
@@ -240,13 +398,40 @@
         <div class="chart" id="ms-c-einsp" style="height:280px"></div>
         <div class="tbl" id="t-ms-c-einsp" hidden></div>
       </article>
-      <article class="card">
-        <header><h2>Tag im Detail <span class="date">kWh je 15 min</span></h2><button class="tbl-btn" data-tbl="ms-c-tag">Tabelle</button></header>
-        <div class="row tight"><input type="date" id="ms-tag" class="date-in"><p class="note" id="ms-n-tag"></p></div>
-        <div class="chart" id="ms-c-tag" style="height:280px"></div>
-        <div class="tbl" id="t-ms-c-tag" hidden></div>
-      </article>
+      </section>
 
+      <!-- Tag im Detail -->
+      <section class="ms-sec" data-sec="tag" hidden>
+        <div class="row">
+          <div class="daynav"><button type="button" class="tbl-btn" id="tg-zurueck" aria-label="Vortag">‹</button><input type="date" id="tg-datum" class="date-in"><button type="button" class="tbl-btn" id="tg-vor" aria-label="Folgetag">›</button></div>
+          <p class="hint" id="tg-hint"></p>
+        </div>
+        <div class="kpis" id="tg-kpis"></div>
+      <article class="card">
+        <header><h2>Erzeugung und Verbrauch <span class="date">kWh je 15 min</span></h2><button class="tbl-btn" data-tbl="tg-c-energie" type="button">Tabelle</button></header>
+        <div class="chart" id="tg-c-energie" style="height:280px"></div>
+        <div class="tbl" id="t-tg-c-energie" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>Netz und Batterie <span class="date">kWh je 15 min</span></h2><button class="tbl-btn" data-tbl="tg-c-netz" type="button">Tabelle</button></header>
+        <div class="chart" id="tg-c-netz" style="height:260px"></div>
+        <div class="tbl" id="t-tg-c-netz" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>Abgleich Netzbezug <span class="date">kWh je 15 min</span></h2><button class="tbl-btn" data-tbl="tg-c-abgl" type="button">Tabelle</button></header>
+        <p class="note" id="n-tg-c-abgl"></p>
+        <div class="chart" id="tg-c-abgl" style="height:220px"></div>
+        <div class="tbl" id="t-tg-c-abgl" hidden></div>
+      </article>
+      <article class="card">
+        <header><h2>Börsenpreis <span class="date">ct/kWh netto</span></h2><button class="tbl-btn" data-tbl="tg-c-preis" type="button">Tabelle</button></header>
+        <div class="chart" id="tg-c-preis" style="height:200px"></div>
+        <div class="tbl" id="t-tg-c-preis" hidden></div>
+      </article>
+      </section>
+
+      <!-- Verwaltung -->
+      <section class="ms-sec" data-sec="verwaltung" hidden>
       <div class="grid2">
         <article class="card">
           <header><h2>Daten importieren</h2></header>
@@ -271,6 +456,7 @@
           </form>
         </article>
       </div>
+      </section>
     </div>
   </section>
 </main>
@@ -287,5 +473,6 @@
 <script src="app.js"></script>
 <script src="tarife.js"></script>
 <script src="mein.js"></script>
+<script src="bereiche.js"></script>
 </body>
 </html>

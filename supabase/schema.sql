@@ -560,3 +560,58 @@ select cron.schedule('bericht-taeglich', '50 5 * * *', $$
     body := '{"ausloeser": "zeitplan"}'::jsonb,
     timeout_milliseconds := 10000)
 $$);
+
+-- =====================================================================
+-- Auswertungen über alle Quellen (Bereiche in „Mein Strom“)
+-- =====================================================================
+-- Tageswerte je Quelle (kWh, Wiener Kalendertag):
+-- [tag, netz_bezug, netz_einsp, netz_viertel, ef_bezug, ef_einsp, ef_pv, ef_viertel,
+--  pv_erzeugung, pv_verbrauch, pv_eigen, bat_laden, bat_entladen, pv_einsp, pv_bezug, {wallbox: kwh}]
+create or replace function public.tage_alle_json(von date, bis date)
+returns jsonb language sql stable security invoker set search_path = ''
+as $$
+  with g as (select von::timestamp at time zone 'Europe/Vienna' a, (bis + 1)::timestamp at time zone 'Europe/Vienna' b),
+  n as (select (ts_start at time zone 'Europe/Vienna')::date tag,
+               sum(kwh) filter (where richtung = 'bezug') bez, sum(kwh) filter (where richtung = 'einspeisung') ein,
+               count(*) filter (where richtung = 'bezug') cnt
+        from public.netz_15min, g where ts_start >= g.a and ts_start < g.b group by 1),
+  e as (select (ts_start at time zone 'Europe/Vienna')::date tag,
+               sum(von_netz_wh) / 1000 bez, sum(ins_netz_wh) / 1000 ein, sum(pv_wh) / 1000 pv,
+               count(*) filter (where coalesce(qualitaet, 100) >= 50 and not luecke) cnt   -- eFriends-Qualität < 50 = unbrauchbar
+        from public.messung_beste, g where ts_start >= g.a and ts_start < g.b group by 1),
+  w as (select tag, jsonb_object_agg(coalesce(wallbox, wallbox_id::text), kwh) wb
+        from (select (start at time zone 'Europe/Vienna')::date tag, wallbox_id, max(wallbox) wallbox, sum(kwh) kwh
+              from public.laden, g where start >= g.a and start < g.b group by 1, 2) x group by 1),
+  t as (select tag from n union select tag from e union select tag from public.pv_tag where tag between von and bis union select tag from w)
+  select coalesce(jsonb_agg(jsonb_build_array(
+           t.tag, round(n.bez::numeric, 3), round(n.ein::numeric, 3), n.cnt,
+           round(e.bez::numeric, 3), round(e.ein::numeric, 3), round(e.pv::numeric, 3), e.cnt,
+           p.pv_kwh, p.verbrauch_kwh, p.eigen_kwh, p.laden_kwh, p.entladen_kwh, p.einspeisung_kwh, p.bezug_kwh,
+           coalesce(w.wb, '{}'::jsonb)) order by t.tag), '[]'::jsonb)
+  from t left join n using (tag) left join e using (tag) left join public.pv_tag p using (tag) left join w using (tag)
+$$;
+revoke all on function public.tage_alle_json(date, date) from public, anon;
+grant execute on function public.tage_alle_json(date, date) to authenticated;
+
+-- Ein Tag in Viertelstunden, alle Quellen (kWh):
+-- [unix_sekunden, netz_bezug, netz_einsp, ef_bezug, ef_einsp, pv_erzeugung, pv_verbrauch, bat_laden, bat_entladen, wallbox]
+create or replace function public.tag_alle_json(tag date)
+returns jsonb language sql stable security invoker set search_path = ''
+as $$
+  with g as (select tag::timestamp at time zone 'Europe/Vienna' a, (tag + 1)::timestamp at time zone 'Europe/Vienna' b),
+  s as (select generate_series(g.a, g.b - interval '15 minutes', interval '15 minutes') ts from g),
+  n as (select ts_start ts, sum(kwh) filter (where richtung = 'bezug') bez, sum(kwh) filter (where richtung = 'einspeisung') ein
+        from public.netz_15min, g where ts_start >= g.a and ts_start < g.b group by 1),
+  e as (select ts_start ts, von_netz_wh / 1000 bez, ins_netz_wh / 1000 ein from public.messung_beste, g where ts_start >= g.a and ts_start < g.b),
+  p as (select date_bin('15 minutes', ts_start, timestamptz '2000-01-01 00:00+00') ts,
+               sum(pv_wh) / 1000 pv, sum(verbrauch_wh) / 1000 verbr, sum(laden_wh) / 1000 lad, sum(entladen_wh) / 1000 entl
+        from public.pv_15min, g where ts_start >= g.a and ts_start < g.b group by 1),
+  w as (select ts_start ts, sum(kwh) kwh from public.laden_15min, g where ts_start >= g.a and ts_start < g.b group by 1)
+  select coalesce(jsonb_agg(jsonb_build_array(extract(epoch from s.ts)::bigint,
+           round(n.bez::numeric, 4), round(n.ein::numeric, 4), round(e.bez::numeric, 4), round(e.ein::numeric, 4),
+           round(p.pv::numeric, 4), round(p.verbr::numeric, 4), round(p.lad::numeric, 4), round(p.entl::numeric, 4),
+           round(w.kwh::numeric, 4)) order by s.ts), '[]'::jsonb)
+  from s left join n using (ts) left join e using (ts) left join p using (ts) left join w using (ts)
+$$;
+revoke all on function public.tag_alle_json(date) from public, anon;
+grant execute on function public.tag_alle_json(date) to authenticated;

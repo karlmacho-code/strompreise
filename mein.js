@@ -63,7 +63,6 @@ function msInit() {
   $m("ms-reload").addEventListener("click", () => { MS.geladen = false; renderMein(); });
   $m("ms-sync-btn").addEventListener("click", msJetztAbrufen);
   $m("ms-file").addEventListener("change", e => msImport([...e.target.files]).finally(() => { e.target.value = ""; }));
-  $m("ms-tag").addEventListener("change", e => { MS.tag = e.target.value; msTagChart(); });
   $m("ms-tarif-form").addEventListener("submit", msTarifSpeichern);
 }
 
@@ -102,6 +101,7 @@ async function msLaden() {
     if (f.error) throw f.error;
     MS.flex = new Map((f.data || []).map(x => [x[0], [x[1], x[2]]]));
   }
+  await bLaden();
   const sl = await MS.sb.from("sync_lauf").select("*").order("id", { ascending: false }).limit(1);
   MS.sync = sl.data && sl.data[0] || null;
   MS.geladen = true;
@@ -110,7 +110,7 @@ async function msLaden() {
     const L = local(Math.floor(last.getTime() / 1000));
     MS.tag = `${L.y}-${String(L.m + 1).padStart(2, "0")}-${String(L.d).padStart(2, "0")}`;
   }
-  msMsg("ms-app-msg", MS.hours.length ? "" : "Noch keine Messdaten. Lade unten einen 15-Minuten-Export aus der eFriends-App hoch.");
+  msMsg("ms-app-msg", (MS.hours.length || (B.tage && B.tage.length)) ? "" : "Noch keine Messdaten. Unter „Verwaltung“ kannst du Exporte hochladen.");
 }
 
 // EPEX-Stundenpreis (ct/kWh netto) zu einem UTC-Stundenbeginn
@@ -209,7 +209,6 @@ async function msJetztAbrufen() {
 function msZeichnen() {
   if (!MS.hours) return;
   msSyncZeigen();
-  const ms = msMonate();
   const st = MS.status || {};
 
   // Kopfzeile / Stand
@@ -217,6 +216,23 @@ function msZeichnen() {
   const live = st.live_letzter;
   $m("ms-stand").textContent = `${MS.hours.length ? nf0.format(MS.hours.length) + " Stunden Messdaten" : "Keine Messdaten"} · Export bis ${exp}` +
     (live ? ` · Live zuletzt ${new Date(live.ts).toLocaleString("de-AT", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}` : " · Live-Sammler inaktiv");
+
+  // Tarif-Formular vorbelegen
+  const t = MS.tarife[MS.tarife.length - 1];
+  if (t) {
+    $m("ms-t-ab").value = t.gueltig_ab; $m("ms-t-name").value = t.name; $m("ms-t-art").value = t.art;
+    $m("ms-t-auf").value = t.aufschlag_pct; $m("ms-t-min").value = t.aufschlag_min_ct_brutto;
+    $m("ms-t-bezug").value = t.bezug_ct_netto ?? ""; $m("ms-t-comm").value = t.community_bezug_ct_netto ?? "";
+    $m("ms-t-grund").value = t.grundgebuehr_eur_brutto; $m("ms-t-fix").value = t.vergleich_fix_ct_netto ?? "";
+  }
+  bZeichnen();
+}
+
+// ---------- Bereich „Kosten und Börse“: eFriends-Abrechnung je Monat ----------
+function msKosten() {
+  const ms = msMonate().filter(e => bImZeitraum(e.y, e.m));
+  const st = MS.status || {};
+  const live = st.live_letzter;
 
   // KPIs
   let k = "";
@@ -227,14 +243,14 @@ function msZeichnen() {
   const cur = ms[ms.length - 1];
   if (cur) {
     const commAnteil = cur.vn ? cur.vc / cur.vn * 100 : 0;
-    k += kpi(`Bezug ${MONATE_LANG[cur.m]}`, nfk.format(kwh(cur.vn)), "kWh", `${nf1.format(commAnteil)} % aus der Community · ${cur.tage.size} Tage`);
+    k += kpi(`eFriends-Bezug ${MONATE_LANG[cur.m]}`, nfk.format(kwh(cur.vn)), "kWh", `${nf1.format(commAnteil)} % aus der Community · ${cur.tage.size} Tage`);
     k += kpi("Kosten eFriends Flex", eur.format(cur.ef + cur.grund), "", `Ø ${fmt(cur.ctBezug)} ct/kWh brutto + ${eur.format(cur.grund)} Gebühren`);
     k += kpi("Zum Vergleich Fixpreis", cur.fix ? eur.format(cur.fix + cur.grund) : "–", "", cur.t && cur.t.vergleich_fix_ct_netto != null ? `bei ${fmt(+cur.t.vergleich_fix_ct_netto)} ct netto` : "");
     k += kpi("Einspeisung", nfk.format(kwh(cur.inn)), "kWh", cur.al ? `${eur.format(cur.einsp)} Vergütung, Ø ${fmt(cur.ctEinsp)} ct` : "");
   }
   $m("ms-kpis").innerHTML = k;
 
-  const xa = (o, list) => { o.xAxis.data = list.map(e => e.ttl); o.xAxis.axisLabel.interval = list.length > 14 ? (i => list[i].m === 0) : 0; if (list.length > 14) o.xAxis.axisLabel.formatter = (v, i) => String(list[i].y); };
+  const xa = (o, list) => monatsAchse(o, list);
   const legend = () => ({ top: 0, left: 0, icon: "circle", itemWidth: 8, itemHeight: 8, textStyle: { color: css("--text-2"), fontSize: 12 } });
   const tip = unit => ps => `<b>${MONATE_LANG[ms[ps[0].dataIndex].m]} ${ms[ps[0].dataIndex].y}</b><br>` + ps.map(p => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px"></span>${p.seriesName}: ${unit(p.value)}`).join("<br>");
   const stackBar = (name, data, color, radius) => ({ type: "bar", name, stack: "s", data, barMaxWidth: 40, itemStyle: { color: css(color), borderRadius: radius, borderColor: css("--surface"), borderWidth: 1 } });
@@ -278,42 +294,7 @@ function msZeichnen() {
   setTable("ms-c-kosten", ["Monat", "Bezug kWh", "Ø Börse lastgewichtet ct netto", "Ø bezahlt ct brutto", "eFriends Flex", "Gebühren", "eFriends gesamt", "smartCONTROL", "Fixpreis", "Preise"],
     ms.map(e => [e.ttl, nfk.format(kwh(e.vn)), fmt(e.ctBoerseLast), fmt(e.ctBezug), eur.format(e.ef), eur.format(e.grund), eur.format(e.ef + e.grund), eur.format(e.smart), eur.format(e.fix), e.quelle]));
 
-  // Tarif-Formular vorbelegen
-  const t = MS.tarife[MS.tarife.length - 1];
-  if (t) {
-    $m("ms-t-ab").value = t.gueltig_ab; $m("ms-t-name").value = t.name; $m("ms-t-art").value = t.art;
-    $m("ms-t-auf").value = t.aufschlag_pct; $m("ms-t-min").value = t.aufschlag_min_ct_brutto;
-    $m("ms-t-bezug").value = t.bezug_ct_netto ?? ""; $m("ms-t-comm").value = t.community_bezug_ct_netto ?? "";
-    $m("ms-t-grund").value = t.grundgebuehr_eur_brutto; $m("ms-t-fix").value = t.vergleich_fix_ct_netto ?? "";
-  }
-  $m("ms-tag").value = MS.tag || "";
-  msTagChart();
   msTarifvergleich();
-}
-
-// ---------- Tagesansicht (Viertelstunden) ----------
-async function msTagChart() {
-  if (!MS.tag || !MS.sb || !MS.user) return;
-  const [y, m, d] = MS.tag.split("-").map(Number);
-  const start = Date.UTC(y, m - 1, d) / 1000;            // 00:00 UTC des Kalendertags
-  const von = start - offset(start), bis = start + 86400 - offset(start + 86400);   // lokale Mitternacht (Wien)
-  const r = await MS.sb.rpc("viertel_json", { von: new Date(von * 1000).toISOString(), bis: new Date(bis * 1000).toISOString() });
-  if (r.error) { msMsg("ms-app-msg", r.error.message, true); return; }
-  const rows = r.data || [];
-  const lab = rows.map(x => { const L = local(x[0]); return `${String(L.h).padStart(2, "0")}:${String(new Date(x[0] * 1000).getUTCMinutes()).padStart(2, "0")}`; });
-  const o = base(); o.grid.top = window.innerWidth < 600 ? 44 : 36;
-  o.legend = { top: 0, left: 0, icon: "circle", itemWidth: 8, itemHeight: 8, textStyle: { color: css("--text-2"), fontSize: 12 } };
-  o.xAxis.data = lab; const step = window.innerWidth < 600 ? 6 : 3;
-  o.xAxis.axisLabel.interval = i => !!lab[i] && lab[i].endsWith(":00") && +lab[i].slice(0, 2) % step === 0;
-  o.tooltip.formatter = ps => `<b>${ps[0].name}</b><br>` + ps.map(p => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px"></span>${p.seriesName}: ${nf2.format(Math.abs(p.value))} kWh`).join("<br>");
-  o.series = [
-    { type: "bar", name: "Bezug", stack: "x", data: rows.map(x => +(x[1] / 1000).toFixed(3)), itemStyle: { color: css("--series-1"), borderRadius: [3, 3, 0, 0] }, barCategoryGap: "20%" },
-    { type: "bar", name: "Einspeisung", stack: "x", data: rows.map(x => -(x[2] / 1000).toFixed(3)), itemStyle: { color: css("--series-2"), borderRadius: [0, 0, 3, 3] } },
-  ];
-  chart("ms-c-tag", o);
-  const sb = rows.reduce((a, x) => a + x[1], 0), se = rows.reduce((a, x) => a + x[2], 0);
-  $m("ms-n-tag").textContent = rows.length ? `Bezug ${nf2.format(sb / 1000)} kWh, Einspeisung ${nf2.format(se / 1000)} kWh · ${rows.length} Viertelstunden` : "Für diesen Tag liegen keine Messdaten vor.";
-  setTable("ms-c-tag", ["Zeit", "Bezug kWh", "Einspeisung kWh", "Quelle"], rows.map((x, i) => [lab[i], nf2.format(x[1] / 1000), nf2.format(x[2] / 1000), x[8]]));
 }
 
 // ---------- Import ----------

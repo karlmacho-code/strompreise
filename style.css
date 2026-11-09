@@ -12,6 +12,7 @@
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --series-4: #eda100;
+  --series-5: #8a5cd6;
   --div-lo: #2a78d6;
   --div-mid: #c3c2b7;
   --div-hi: #e34948;
@@ -25,7 +26,7 @@
     color-scheme: dark;
     --page: #0d0d0d; --surface: #1a1a19; --text: #f0efec; --text-2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
-    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; --series-5: #9b74e8;
     --div-lo: #3987e5; --div-mid: #5a5955; --div-hi: #e66767;
     --accent: #3987e5; --accent-wash: rgba(57,135,229,0.16);
     --shadow: none;
@@ -35,13 +36,14 @@
   color-scheme: dark;
   --page: #0d0d0d; --surface: #1a1a19; --text: #f0efec; --text-2: #c3c2b7; --muted: #898781;
   --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
-  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; --series-5: #9b74e8;
   --div-lo: #3987e5; --div-mid: #5a5955; --div-hi: #e66767;
   --accent: #3987e5; --accent-wash: rgba(57,135,229,0.16);
   --shadow: none;
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background: var(--page); color: var(--text);
@@ -162,3 +164,17 @@ code { font-size: 12px; background: var(--accent-wash); padding: 1px 5px; border
 .sub3 { font-size: 13px; font-weight: 600; color: var(--text-2); margin: 14px 0 2px; }
 .note.fein { font-size: 12px; color: var(--muted); margin-top: 12px; }
 #tv-card > header select { margin-left: auto; }
+
+/* Bereiche in „Mein Strom“ */
+.ms-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 2px 0 14px; }
+.subtabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; max-width: 100%; padding: 2px 0; }
+.subtabs::-webkit-scrollbar { display: none; }
+.subtabs button { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 6px 13px; font-size: 13px; color: var(--text-2); white-space: nowrap; cursor: pointer; }
+.subtabs button:hover { color: var(--text); }
+.subtabs button[aria-current="true"] { background: var(--accent-wash); border-color: var(--accent); color: var(--text); font-weight: 600; }
+.grid2.mb { margin-bottom: 14px; }
+.daynav { display: inline-flex; align-items: center; gap: 6px; }
+.daynav .tbl-btn { font-size: 16px; line-height: 1; padding: 6px 11px; }
+#ab-tage { max-height: none; border-top: 0; }
+@media (max-width: 600px) { .ms-bar { flex-direction: column; align-items: stretch; } .ms-bar .field { justify-content: space-between; } }
+.ms-sec.laedt { opacity: .5; transition: opacity .2s; pointer-events: none; }

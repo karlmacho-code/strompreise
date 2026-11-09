@@ -42,6 +42,7 @@ const dayKey = (y, m, d) => y * 10000 + (m + 1) * 100 + d;
 const nf2 = new Intl.NumberFormat("de-AT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const nf1 = new Intl.NumberFormat("de-AT", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const nf0 = new Intl.NumberFormat("de-AT", { maximumFractionDigits: 0 });
+const nfAchse = new Intl.NumberFormat("de-AT", { maximumFractionDigits: 2 });
 const fmt = v => (v == null || Number.isNaN(v)) ? "–" : nf2.format(v);
 const price = v => v == null ? null : (S.mode === "brutto" ? (v + FEE) * (1 + VAT) : v);
 const einheit = () => S.mode === "brutto" ? "ct/kWh brutto" : "ct/kWh netto";
@@ -71,7 +72,7 @@ function base() {
       axisPointer: { type: "line", lineStyle: { color: css("--axis") } },
     },
     xAxis: { type: "category", axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--muted"), fontSize: 11 } },
-    yAxis: { type: "value", axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: css("--grid") } }, axisLabel: { color: css("--muted"), fontSize: 11 } },
+    yAxis: { type: "value", axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: css("--grid") } }, axisLabel: { color: css("--muted"), fontSize: 11, formatter: v => nfAchse.format(v) } },
   };
 }
 function chart(id, option) {

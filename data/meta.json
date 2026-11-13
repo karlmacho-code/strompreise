@@ -1,9 +1,9 @@
 {
- "aktualisiert_utc": "2026-11-12T21:51:52+00:00",
+ "aktualisiert_utc": "2026-11-13T19:53:25+00:00",
  "erster_utc": 1609455600,
- "letzter_utc": 1794607200,
- "letzter_lokal": "2026-11-13T23:00:00+01:00",
- "stunden": 51432,
+ "letzter_utc": 1794693600,
+ "letzter_lokal": "2026-11-14T23:00:00+01:00",
+ "stunden": 51456,
  "luecken": 0,
  "morgen_vorhanden": true,
  "quelle": "EPEX Spot AT Day-Ahead; bis 27.07.2025 smartENERGY, danach Energy-Charts (Fraunhofer ISE, Bundesnetzagentur | SMARD.de, CC BY 4.0)"
